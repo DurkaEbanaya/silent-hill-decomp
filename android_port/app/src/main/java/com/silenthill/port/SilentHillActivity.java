@@ -73,11 +73,30 @@ public class SilentHillActivity extends SDLActivity {
      * laid out without vsync. So the timer must never expire. A wake lock
      * acquired with ACQUIRE_CAUSES_WAKEUP is the one call an ordinary app may
      * make that counts as user activity to PowerManager; a one-second timed
-     * acquire every sixty seconds is a periodic nudge. */
+     * acquire every sixty seconds is a periodic nudge.
+     *
+     * That alone did not stop it: the cabinet still froze at 300 s with the
+     * last poke 18 s old, so the five-minute timer is not PowerManager's.
+     * Real input does reset it, so the poke also injects a Scroll Lock press
+     * into our own window, which needs no permission and which nothing in
+     * the game binds (the controls panel refuses it). Instrumentation may not
+     * run on the main thread, hence the worker. */
     private static final android.os.Handler sPokeHandler =
         new android.os.Handler(android.os.Looper.getMainLooper());
     private static PowerManager.WakeLock sPokeLock;
     private static long sLastPokeMs;
+    private static volatile String sInjectResult = "never";
+    private static android.os.Handler sInjectHandler;
+    private static final Runnable sInject = new Runnable() {
+        public void run() {
+            try {
+                new android.app.Instrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_SCROLL_LOCK);
+                sInjectResult = "ok";
+            } catch (Throwable t) {
+                sInjectResult = t.getClass().getSimpleName();
+            }
+        }
+    };
     private static final Runnable sPoke = new Runnable() {
         public void run() {
             try {
@@ -85,6 +104,12 @@ public class SilentHillActivity extends SDLActivity {
                     sPokeLock.acquire(1000);
                     sLastPokeMs = android.os.SystemClock.uptimeMillis();
                 }
+                if (sInjectHandler == null) {
+                    android.os.HandlerThread ht = new android.os.HandlerThread("SilentHill:inject");
+                    ht.start();
+                    sInjectHandler = new android.os.Handler(ht.getLooper());
+                }
+                sInjectHandler.post(sInject);
             } catch (Throwable t) {
                 Log.w(TAG, "poke: " + t);
             }
@@ -132,7 +157,16 @@ public class SilentHillActivity extends SDLActivity {
                 }
             }
             sb.append(" wakeLock=").append(sScreenLock != null && sScreenLock.isHeld())
-              .append(" lastPokeAgo=").append(sLastPokeMs == 0 ? -1 : (android.os.SystemClock.uptimeMillis() - sLastPokeMs) / 1000).append("s");
+              .append(" lastPokeAgo=").append(sLastPokeMs == 0 ? -1 : (android.os.SystemClock.uptimeMillis() - sLastPokeMs) / 1000).append("s")
+              .append(" inject=").append(sInjectResult);
+            if (ctx != null) {
+                android.content.ContentResolver cr = ctx.getContentResolver();
+                sb.append(" screenOffTimeout=").append(android.provider.Settings.System.getInt(cr, android.provider.Settings.System.SCREEN_OFF_TIMEOUT, -1))
+                  .append(" stayOnPlugged=").append(android.provider.Settings.Global.getInt(cr, android.provider.Settings.Global.STAY_ON_WHILE_PLUGGED_IN, -1))
+                  .append(" screensaver=").append(android.provider.Settings.Secure.getInt(cr, "screensaver_enabled", -1))
+                  .append("/sleep").append(android.provider.Settings.Secure.getInt(cr, "screensaver_activate_on_sleep", -1))
+                  .append("/dock").append(android.provider.Settings.Secure.getInt(cr, "screensaver_activate_on_dock", -1));
+            }
         } catch (Throwable t) {
             sb.append(" err=").append(t);
         }
