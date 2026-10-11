@@ -2249,6 +2249,24 @@ void MainLoop(void) // 0x80032EE0
     // Run game.
     while (true)
     {
+#ifdef SH_PC_PORT
+        /* Android has the window surface: the app is backgrounded, or the
+         * surface is being rebuilt after the system abandoned it (the arcade
+         * cabinet does that at five minutes idle, with no pause event). SDL
+         * has un-made the GL context current on this thread for the duration,
+         * and game code reaches GL through DrawSync, so nothing below may run
+         * until it is back. Pump events, yield, try again. */
+        {
+            extern int  g_PsyX_AppPaused;
+            extern void PsyX_PauseIdle(void);
+
+            if (g_PsyX_AppPaused)
+            {
+                PsyX_PauseIdle();
+                continue;
+            }
+        }
+#endif
         g_TickCount++;
 
 #ifdef SH_PC_PORT
