@@ -23,6 +23,9 @@
          SecurityException the moment it connects, which reads in game as a
          sign-in that silently does nothing. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The screen wake lock held while the game is on screen; see
+         SilentHillActivity.onResume. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

@@ -10,6 +10,11 @@ import android.widget.LinearLayout;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
+import android.os.Build;
+import android.os.PowerManager;
+import android.view.Display;
+import android.view.View;
+import android.view.WindowManager;
 
 import org.libsdl.app.SDLActivity;
 
@@ -44,6 +49,119 @@ public class SilentHillActivity extends SDLActivity {
         unpackBundledAssets();
         publishDiscDropDir();
         super.onCreate(savedInstanceState);
+    }
+
+    /* ---- Cabinet freeze diagnostics and recovery (see PsyX_render.cpp) ----
+     *
+     * At exactly five minutes of inactivity the cabinet's firmware does
+     * something to the display that abandons this app's window buffers
+     * without a surfaceDestroyed or an onPause: EGL still considers the
+     * surface valid and bound, yet eglSwapBuffers fails with EGL_BAD_SURFACE
+     * on every frame from then on, while the panel keeps showing the last
+     * frame it was given. The game cannot read logcat on that firmware, so
+     * native code asks here instead. */
+
+    private static PowerManager.WakeLock sScreenLock;
+
+    /** Everything Android will tell us about the display and our window. */
+    public static String shDisplayState() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            Context ctx = getContext();
+            sb.append("sdk=").append(Build.VERSION.SDK_INT)
+              .append(" device=").append(Build.MANUFACTURER).append('/')
+              .append(Build.MODEL).append('/').append(Build.DEVICE);
+            if (ctx != null) {
+                PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+                if (pm != null)
+                    sb.append(" interactive=").append(pm.isInteractive());
+                WindowManager wm = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) {
+                    Display d = wm.getDefaultDisplay();
+                    if (d != null)
+                        sb.append(" displayState=").append(d.getState());   /* 1 OFF, 2 ON, 3 DOZE, 4 DOZE_SUSPEND, 6 ON_SUSPEND */
+                }
+            }
+            sb.append(" resumed=").append(mIsResumedCalled).append(" focus=").append(mHasFocus);
+            if (mSurface != null) {
+                android.view.SurfaceHolder h = mSurface.getHolder();
+                boolean valid = h != null && h.getSurface() != null && h.getSurface().isValid();
+                sb.append(" surfaceValid=").append(valid)
+                  .append(" shown=").append(mSurface.isShown())
+                  .append(" winVis=").append(mSurface.getWindowVisibility());
+            }
+            if (ctx instanceof android.app.Activity) {
+                android.view.Window w = ((android.app.Activity) ctx).getWindow();
+                if (w != null)
+                    sb.append(" keepScreenOn=")
+                      .append((w.getAttributes().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0);
+            }
+            sb.append(" wakeLock=").append(sScreenLock != null && sScreenLock.isHeld());
+        } catch (Throwable t) {
+            sb.append(" err=").append(t);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Force the SurfaceView to drop and rebuild its window. Hiding the view
+     * destroys the surface, showing it again creates a fresh one, and SDL's
+     * ordinary surfaceDestroyed/surfaceCreated path takes it from there --
+     * the only route to a new native window once the old one is abandoned.
+     * The second step is delayed so the view system does not fold the two
+     * visibility changes into nothing.
+     */
+    public static void shRecreateSurface() {
+        final Context ctx = getContext();
+        if (!(ctx instanceof SilentHillActivity) || mSurface == null)
+            return;
+        final SilentHillActivity act = (SilentHillActivity) ctx;
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                final View v = mSurface;
+                if (v == null)
+                    return;
+                Log.w(TAG, "presentation lost; recreating the SDL surface");
+                v.setVisibility(View.GONE);
+                v.postDelayed(new Runnable() {
+                    public void run() { v.setVisibility(View.VISIBLE); }
+                }, 150);
+            }
+        });
+    }
+
+    /* A wake lock alongside the keep-screen-on window flag. The flag is what
+     * SDL already sets and the firmware evidently does not honour it; a lock
+     * is a different request through a different path, and it costs nothing
+     * to hold while the game is on screen. Deprecated API, still functional. */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && sScreenLock == null) {
+                sScreenLock = pm.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE,
+                    "SilentHill:screen");
+                sScreenLock.setReferenceCounted(false);
+            }
+            if (sScreenLock != null && !sScreenLock.isHeld())
+                sScreenLock.acquire();
+            Log.i(TAG, "screen wake lock held=" + (sScreenLock != null && sScreenLock.isHeld()));
+        } catch (Throwable t) {
+            Log.w(TAG, "wake lock: " + t);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        try {
+            if (sScreenLock != null && sScreenLock.isHeld())
+                sScreenLock.release();
+        } catch (Throwable t) {
+            /* nothing to do */
+        }
+        super.onPause();
     }
 
     /**
