@@ -63,6 +63,35 @@ public class SilentHillActivity extends SDLActivity {
 
     private static PowerManager.WakeLock sScreenLock;
 
+    /* User-activity poke, every minute while the game is on screen.
+     *
+     * The cabinet parks its display pipeline at exactly five minutes without
+     * input: SurfaceFlinger stops composing and stops delivering vsync, the
+     * panel holds its last frame, and the framework is never told (it still
+     * reports the display ON, our window valid and visible). Once parked,
+     * nothing an app does brings it back -- a rebuilt surface cannot even be
+     * laid out without vsync. So the timer must never expire. A wake lock
+     * acquired with ACQUIRE_CAUSES_WAKEUP is the one call an ordinary app may
+     * make that counts as user activity to PowerManager; a one-second timed
+     * acquire every sixty seconds is a periodic nudge. */
+    private static final android.os.Handler sPokeHandler =
+        new android.os.Handler(android.os.Looper.getMainLooper());
+    private static PowerManager.WakeLock sPokeLock;
+    private static long sLastPokeMs;
+    private static final Runnable sPoke = new Runnable() {
+        public void run() {
+            try {
+                if (sPokeLock != null) {
+                    sPokeLock.acquire(1000);
+                    sLastPokeMs = android.os.SystemClock.uptimeMillis();
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "poke: " + t);
+            }
+            sPokeHandler.postDelayed(this, 60000);
+        }
+    };
+
     /** Everything Android will tell us about the display and our window. */
     public static String shDisplayState() {
         StringBuilder sb = new StringBuilder();
@@ -89,14 +118,21 @@ public class SilentHillActivity extends SDLActivity {
                 sb.append(" surfaceValid=").append(valid)
                   .append(" shown=").append(mSurface.isShown())
                   .append(" winVis=").append(mSurface.getWindowVisibility());
+                android.graphics.Rect fr = (h != null) ? h.getSurfaceFrame() : null;
+                sb.append(" surfaceFrame=").append(fr != null ? fr.width() + "x" + fr.height() : "?")
+                  .append(" view=").append(mSurface.getWidth()).append('x').append(mSurface.getHeight());
             }
             if (ctx instanceof android.app.Activity) {
                 android.view.Window w = ((android.app.Activity) ctx).getWindow();
-                if (w != null)
+                if (w != null) {
+                    View dv = w.getDecorView();
                     sb.append(" keepScreenOn=")
-                      .append((w.getAttributes().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0);
+                      .append((w.getAttributes().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0)
+                      .append(" decor=").append(dv.getWidth()).append('x').append(dv.getHeight());
+                }
             }
-            sb.append(" wakeLock=").append(sScreenLock != null && sScreenLock.isHeld());
+            sb.append(" wakeLock=").append(sScreenLock != null && sScreenLock.isHeld())
+              .append(" lastPokeAgo=").append(sLastPokeMs == 0 ? -1 : (android.os.SystemClock.uptimeMillis() - sLastPokeMs) / 1000).append("s");
         } catch (Throwable t) {
             sb.append(" err=").append(t);
         }
@@ -147,6 +183,15 @@ public class SilentHillActivity extends SDLActivity {
             }
             if (sScreenLock != null && !sScreenLock.isHeld())
                 sScreenLock.acquire();
+            if (pm != null && sPokeLock == null) {
+                sPokeLock = pm.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                        | PowerManager.ON_AFTER_RELEASE,
+                    "SilentHill:poke");
+                sPokeLock.setReferenceCounted(false);
+            }
+            sPokeHandler.removeCallbacks(sPoke);
+            sPokeHandler.postDelayed(sPoke, 60000);
             Log.i(TAG, "screen wake lock held=" + (sScreenLock != null && sScreenLock.isHeld()));
         } catch (Throwable t) {
             Log.w(TAG, "wake lock: " + t);
@@ -155,6 +200,7 @@ public class SilentHillActivity extends SDLActivity {
 
     @Override
     protected void onPause() {
+        sPokeHandler.removeCallbacks(sPoke);
         try {
             if (sScreenLock != null && sScreenLock.isHeld())
                 sScreenLock.release();
