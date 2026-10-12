@@ -3179,6 +3179,56 @@ void MainLoop(void) // 0x80032EE0
                                (unsigned long)s_perfWorstMs,
                                (double)s_perfVbAccum / s_perfFrames,
                                (unsigned long)s_perfFrames);
+#if defined(__ANDROID__)
+                    /* [SYSMEM] The cabinet freeze lands ~318 s after launch in every
+                     * run, independent of input and of frame count, and the driver
+                     * reports GL_OUT_OF_MEMORY as it hits. WindowManager destroys app
+                     * surfaces when graphics-buffer allocation fails system-wide, so
+                     * this tracks system memory and the GPU driver's own totals over
+                     * time. Our RSS was flat; GPU and ION pages are not in RSS. */
+                    {
+                        static const char* s_gpuPaths[] = {
+                            "/proc/mali/memory_usage", "/proc/gpu_memory", "/sys/kernel/ged/hal/total_gpu_memory",
+                            "/proc/mtk_mali/gpu_memory", "/sys/kernel/debug/mali0/gpu_memory", "/d/mali0/gpu_memory",
+                            "/sys/class/misc/mali0/device/gpu_memory", "/proc/ion/vmalloc"
+                        };
+                        static int  s_sysmemFirst = 1;
+                        char        line[160];
+                        long        avail = -1, freeKb = -1, cached = -1;
+                        FILE*       f = fopen("/proc/meminfo", "r");
+                        unsigned    gi;
+
+                        if (f != NULL)
+                        {
+                            while (fgets(line, sizeof(line), f) != NULL)
+                            {
+                                sscanf(line, "MemAvailable: %ld", &avail);
+                                sscanf(line, "MemFree: %ld", &freeKb);
+                                sscanf(line, "Cached: %ld", &cached);
+                            }
+                            fclose(f);
+                        }
+                        SH_DBG("[SYSMEM] t=%lus avail=%ldMB free=%ldMB cached=%ldMB",
+                               (unsigned long)(perfNowMs / 1000), avail / 1024, freeKb / 1024, cached / 1024);
+                        for (gi = 0; gi < sizeof(s_gpuPaths) / sizeof(s_gpuPaths[0]); gi++)
+                        {
+                            f = fopen(s_gpuPaths[gi], "r");
+                            if (f == NULL)
+                            {
+                                if (s_sysmemFirst)
+                                    SH_DBG("[SYSMEM] %s unreadable", s_gpuPaths[gi]);
+                                continue;
+                            }
+                            if (fgets(line, sizeof(line), f) != NULL)
+                            {
+                                line[strcspn(line, "\r\n")] = 0;
+                                SH_DBG("[SYSMEM] %s: %s", s_gpuPaths[gi], line);
+                            }
+                            fclose(f);
+                        }
+                        s_sysmemFirst = 0;
+                    }
+#endif
                         s_perfFrames = 0; s_perfAccumMs = 0; s_perfWorstMs = 0; s_perfVbAccum = 0;
                     }
                 }
