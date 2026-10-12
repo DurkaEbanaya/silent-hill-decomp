@@ -51,6 +51,9 @@ int g_PcFmvClockDiscard = 0;
  * SDL_GetTicks calls a frame and prints nothing on a healthy run. */
 static unsigned int s_sfTop, s_sfUpdStart, s_sfUpdEnd, s_sfFsqEnd, s_sfSwapEnd;
 #include <stdio.h>
+#if defined(__ANDROID__)
+#include <dirent.h>
+#endif
 #include <SDL_scancode.h>
 #include <SDL_mouse.h>
 extern u8 g_WorldEnvWork[];
@@ -3208,8 +3211,21 @@ void MainLoop(void) // 0x80032EE0
                             }
                             fclose(f);
                         }
-                        SH_DBG("[SYSMEM] t=%lus avail=%ldMB free=%ldMB cached=%ldMB",
-                               (unsigned long)(perfNowMs / 1000), avail / 1024, freeKb / 1024, cached / 1024);
+                        {
+                            int  fds = -1;
+                            DIR* fdDir = opendir("/proc/self/fd");
+
+                            if (fdDir != NULL)
+                            {
+                                fds = 0;
+                                while (readdir(fdDir) != NULL)
+                                    fds++;
+                                closedir(fdDir);
+                                fds -= 3; /* ".", ".." and the directory's own descriptor */
+                            }
+                            SH_DBG("[SYSMEM] t=%lus avail=%ldMB free=%ldMB cached=%ldMB fds=%d",
+                                   (unsigned long)(perfNowMs / 1000), avail / 1024, freeKb / 1024, cached / 1024, fds);
+                        }
                         for (gi = 0; gi < sizeof(s_gpuPaths) / sizeof(s_gpuPaths[0]); gi++)
                         {
                             f = fopen(s_gpuPaths[gi], "r");
