@@ -4379,27 +4379,54 @@ void Options_BrightnessMenu_Control(void) // 0x801E6018
                      * per-row hit-test) — Up/Down selects the row. */
                     if (wheel != 0)
                         Pc_BrightnessRowAdjust(g_PcBrtRow, wheel);
-                    else if (Pc_MouseCursor_LeftClicked())
+                    else if (Pc_Touch_UsedRecently())
                     {
-                        /* Leaving was right-click only, and a touchscreen has no
-                         * second button -- so on a phone this screen could not be
-                         * left at all without a pad. A tap in the middle third
-                         * backs out; left and right still adjust, which is where
-                         * a finger naturally goes to change a value anyway.
-                         * Mouse behaviour is untouched. */
-                        if (Pc_Touch_UsedRecently() && mx >= 120 && mx <= 200)
+                        /* A finger has no Up/Down, so without this only the row
+                         * the screen opened on could ever change. The way out is
+                         * the touch overlay's corner Back button; the screen
+                         * itself is all controls. Rows are hit-tested in the
+                         * presented picture's space because UiPos's height
+                         * follows the framebuffer mode. Bands match ConfigDraw:
+                         * text top at 52% + 8% per row. */
+                        static int s_brtHoldFrames;
+                        static int s_brtHoldDir;
+                        float      nx, ny;
+                        int        row = -1;
+
+                        if (Pc_MouseCursor_ViewportPos(&nx, &ny) &&
+                            ny >= 0.50f && ny < 0.50f + 0.08f * PC_BRT_ROWS)
+                            row = (int)((ny - 0.50f) / 0.08f);
+
+                        if (Pc_MouseCursor_LeftClicked())
                         {
-                            /* Belt and braces: the Leave state clears this too,
-                             * but the bar is drawn by the post shader from a
-                             * global, so if any exit path ever misses it the bar
-                             * is left burned across the picture. */
-                            { extern int g_cfg_calibBar; g_cfg_calibBar = 0; }
-                            PcMouse_InjectCancel();
+                            s_brtHoldDir    = 0;
+                            s_brtHoldFrames = 0;
+                            if (row >= 0 && row < PC_BRT_ROWS && row != g_PcBrtRow)
+                            {
+                                g_PcBrtRow = row;
+                                Sd_PlaySfx(Sfx_MenuMove, 0, Q8(0.25f));
+                            }
+                            else if (mx < 120 || mx > 200)
+                            {
+                                s_brtHoldDir = (mx < 160) ? -1 : +1;
+                                Pc_BrightnessRowAdjust(g_PcBrtRow, s_brtHoldDir);
+                            }
+                        }
+                        /* The percentage rows are 35 steps end to end. */
+                        else if (s_brtHoldDir != 0 && Pc_MouseCursor_LeftHeld())
+                        {
+                            s_brtHoldFrames++;
+                            if (s_brtHoldFrames > 20 && (s_brtHoldFrames % 4) == 0)
+                                Pc_BrightnessRowAdjust(g_PcBrtRow, s_brtHoldDir);
                         }
                         else
                         {
-                            Pc_BrightnessRowAdjust(g_PcBrtRow, (mx < 160) ? -1 : +1);
+                            s_brtHoldDir = 0;
                         }
+                    }
+                    else if (Pc_MouseCursor_LeftClicked())
+                    {
+                        Pc_BrightnessRowAdjust(g_PcBrtRow, (mx < 160) ? -1 : +1);
                     }
 
                     if (Pc_MouseCursor_RightClicked())
