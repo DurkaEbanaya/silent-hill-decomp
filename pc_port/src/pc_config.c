@@ -38,7 +38,11 @@ s_PcConfig g_PcConfig = {
 #endif
     .weatherSimHz      = 60,   /* per-frame weather sim; 30 = the console's cadence */
     .cutsceneLineGapMs = 300,
+#if defined(SH_IOS) || defined(__ANDROID__)
+    .darkHarry         = 0,   /* mobile: off unless dark_harry = 1 in config.cfg */
+#else
     .darkHarry         = 1,   /* on by default for now */
+#endif
     .darkHarryAfkSec   = 300, /* five minutes */
     .darkHarryDistance = 14,
     .darkHarryX        = 0,   /* unset: see dark_harry_x */
