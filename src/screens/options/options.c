@@ -4282,6 +4282,9 @@ void Options_ScreenPosMenu_ConfigDraw(void) // 0x801E5CBC
 static s32 g_PcBrtRow = 0;
 
 #define PC_BRT_ROWS 4
+/* Top row's y in percent, 8 per row after it. 52 put CLASSIC under the
+ * reference bar on a 224-line frame (bottom ~15% of the picture). */
+#define PC_BRT_ROW_Y0 46.0f
 
 static void Pc_BrightnessRowAdjust(s32 row, int dir)
 {
@@ -4384,18 +4387,21 @@ void Options_BrightnessMenu_Control(void) // 0x801E6018
                         /* A finger has no Up/Down, so without this only the row
                          * the screen opened on could ever change. The way out is
                          * the touch overlay's corner Back button; the screen
-                         * itself is all controls. Rows are hit-tested in the
-                         * presented picture's space because UiPos's height
-                         * follows the framebuffer mode. Bands match ConfigDraw:
-                         * text top at 52% + 8% per row. */
+                         * itself is all controls. UiPos is in the framebuffer
+                         * space ConfigDraw positions its text in, so each band
+                         * is that row's 16px line plus the gap below it. */
                         static int s_brtHoldFrames;
                         static int s_brtHoldDir;
-                        float      nx, ny;
                         int        row = -1;
+                        int        r;
 
-                        if (Pc_MouseCursor_ViewportPos(&nx, &ny) &&
-                            ny >= 0.50f && ny < 0.50f + 0.08f * PC_BRT_ROWS)
-                            row = (int)((ny - 0.50f) / 0.08f);
+                        for (r = 0; r < PC_BRT_ROWS; r++)
+                        {
+                            int top = SCREEN_POSITION_Y(PC_BRT_ROW_Y0 + (float)r * 8.0f);
+
+                            if (my >= top - 2 && my < top + 17)
+                                row = r;
+                        }
 
                         if (Pc_MouseCursor_LeftClicked())
                         {
@@ -4545,7 +4551,7 @@ void Options_BrightnessMenu_ConfigDraw(void) // 0x801E6238
              * and the reference lines behind the panel already move with it the
              * way they did in the original screen. */
             Gfx_StringSetColor(i == g_PcBrtRow ? StringColorId_Gold : StringColorId_White);
-            Gfx_StringSetPosition(SCREEN_POSITION_X(22.0f), SCREEN_POSITION_Y(52.0f + (float)i * 8.0f));
+            Gfx_StringSetPosition(SCREEN_POSITION_X(22.0f), SCREEN_POSITION_Y(PC_BRT_ROW_Y0 + (float)i * 8.0f));
             Gfx_StringDraw(NAMES[i], 20);
             Gfx_StringDrawInt(3, (s32)g_GameWork.config.brightness);
             continue;
@@ -4555,7 +4561,7 @@ void Options_BrightnessMenu_ConfigDraw(void) // 0x801E6238
          * Selection shown by gold vs white — no bracket glyph (the menu font
          * renders '[' as a curly quote). */
         Gfx_StringSetColor(i == g_PcBrtRow ? StringColorId_Gold : StringColorId_White);
-        Gfx_StringSetPosition(SCREEN_POSITION_X(22.0f), SCREEN_POSITION_Y(52.0f + (float)i * 8.0f));
+        Gfx_StringSetPosition(SCREEN_POSITION_X(22.0f), SCREEN_POSITION_Y(PC_BRT_ROW_Y0 + (float)i * 8.0f));
         Gfx_StringDraw(NAMES[i], 20);
         Gfx_StringDrawInt(3, (s32)((*vals[i] * 100.0f) + 0.5f));
     }
@@ -4578,7 +4584,7 @@ void Options_BrightnessMenu_ArrowsDraw(void) // 0x801E628C
      * in centre-origin space, so subtract the 112 draw-offset (+5 to centre the
      * knob on the text line, matching the original's 84 vs its 79.5% value row).
      * X (8/64) already brackets the value column. */
-    s32 yc  = (s32)(SCREEN_HEIGHT * ((52.0f + (float)g_PcBrtRow * 8.0f) / 100.0f)) - 107;
+    s32 yc  = (s32)(SCREEN_HEIGHT * ((PC_BRT_ROW_Y0 + (float)g_PcBrtRow * 8.0f) / 100.0f)) - 107;
     /* Shift both knobs right so the left one clears the label and they bracket
      * the value number (labels are longer than the retail "LEVEL"). With the
      * value column now aligned across rows, 10 sits the knobs a touch tighter
