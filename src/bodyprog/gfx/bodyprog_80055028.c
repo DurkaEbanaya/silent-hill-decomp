@@ -5664,7 +5664,14 @@ typedef struct
 } PcFarChunk;
 
 #define PC_FAR_CHUNK_MAX      256
+#if defined(__ANDROID__) || defined(SH_IOS)
+/* Phones run at 60 fps where the desktop default is 30, so half the per-frame
+ * budget rebuilds just as many chunks a second, and a build (colour pass, sort,
+ * mesh upload) lands as half the spike on a mobile CPU. */
+#define PC_FAR_BUILDS_PER_FRM 3
+#else
 #define PC_FAR_BUILDS_PER_FRM 6
+#endif
 
 static PcFarChunk s_pcFarChunks[PC_FAR_CHUNK_MAX];
 static s32        s_pcFarChunkCount;

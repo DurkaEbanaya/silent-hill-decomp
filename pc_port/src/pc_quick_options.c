@@ -30,6 +30,7 @@
 
 #include "pc_quick_options.h"
 #include "pc_bind_panel.h"
+#include "pc_confirm_dialog.h"
 #include "pc_mouse_cursor.h"
 #include "pc_config.h"
 #include "lang_text.h"
@@ -75,6 +76,12 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
 extern const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz);
 extern void        PcOpt_QuickExtraAdjust(int which, int dir);
 extern void        PcOpt_QuickViewReset(int mode);
+#if defined(SH_IOS) || defined(__ANDROID__)
+extern int               PcOpt_PgxpFogAskTake(void);
+extern void              PcOpt_PgxpFogAnswer(int yes);
+extern const char* const PC_PGXP_FOG_TITLE;
+extern const char* const PC_PGXP_FOG_MSG;
+#endif
 
 #define QO_GARBAGE  48
 #define QO_MAX_ROWS 18
@@ -1612,6 +1619,14 @@ void Pc_QuickOptions_Close(void)
      * Update, so closing the menu under it left it drawn with nothing able to
      * close it. Whatever closes the menu closes it too. */
     Pc_BindPanel_Close();
+#if defined(QO_MOBILE)
+    /* Same for the fog row's PGXP question, which only this Update answers. */
+    if (Pc_ConfirmDialog_IsOpen())
+    {
+        Pc_ConfirmDialog_Cancel();
+        PcOpt_PgxpFogAnswer(0);
+    }
+#endif
     s_phase      = QO_CLOSING;
     s_phaseStart = SDL_GetTicks();
 }
@@ -1778,6 +1793,28 @@ void Pc_QuickOptions_Update(int up, int down, int left, int right,
 
     if (s_phase != QO_SHOWN) /* ignore input while animating in/out */
         return;
+
+#if defined(QO_MOBILE)
+    /* The fog row's PGXP offer (see PcOpt_PgxpFogCheck). The dialog reads the
+     * pointer itself; this menu sits still underneath until it is answered. */
+    if (Pc_ConfirmDialog_IsOpen())
+    {
+        const int res = Pc_ConfirmDialog_Update(left, right, confirm, close);
+        if (res != PC_CONFIRM_NONE)
+        {
+            qo_beep(res == PC_CONFIRM_YES ? Sfx_MenuConfirm : Sfx_MenuCancel);
+            PcOpt_PgxpFogAnswer(res == PC_CONFIRM_YES);
+        }
+        else if (left || right)
+            qo_beep(Sfx_MenuMove);
+        return;
+    }
+    if (PcOpt_PgxpFogAskTake())
+    {
+        Pc_ConfirmDialog_Open(PC_PGXP_FOG_TITLE, PC_PGXP_FOG_MSG);
+        return;
+    }
+#endif
 
     /* Dropdown open: it owns every input until it closes. */
     if (s_ddRow >= 0 && s_ddRow < nRows && qo_row_is_list(&rows[s_ddRow]))
