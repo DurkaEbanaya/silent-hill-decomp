@@ -1185,7 +1185,9 @@ void PcConfig_Load(const char* path)
         {
             int v = atoi(value);
 
-            if (v < TouchStyle_Context || v > TouchStyle_Gamepad)
+            /* Not a range: Context_Fixed was appended as 2, after Gamepad, and
+             * a "Context..Gamepad" bound reset it to Context on every load. */
+            if (v != TouchStyle_Context && v != TouchStyle_Gamepad && v != TouchStyle_ContextFixed)
                 v = TouchStyle_Context;
 
             g_PcConfig.touchStyle = v;
