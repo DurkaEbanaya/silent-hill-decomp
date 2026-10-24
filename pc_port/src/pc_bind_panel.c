@@ -35,7 +35,7 @@
 #include "pc_config.h"
 #include "control_style.h"
 #include "lang_quick.h"
-#include "pc_quick_options.h"
+#include "pc_menu_font.h"
 #include "sh_log.h"
 #include "game.h"
 #include "bodyprog/sound/sfx_id_enum.h"

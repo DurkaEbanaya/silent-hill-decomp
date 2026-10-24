@@ -27,9 +27,10 @@
 #include <PsyX/PsyX_backend.h>
 
 #include "stb_truetype.h"
-#include "stb_image.h"
 
 #include "pc_quick_options.h"
+#include "pc_menu_font.h"
+#include "pc_title_screen.h"
 #include "pc_mouse_click_icons.h"
 #include "pc_dpad_icons.h"
 #include "pc_bind_panel.h"
@@ -39,23 +40,14 @@
 #include "pc_cheats.h"
 #include "control_style.h"
 #include "lang_quick.h"
-#include "lang_ru.h"
-#include "lang_pack.h"
 #include "pc_options_help.h"
 #include "pc_menu_preview.h"
-#include "pc_title_style.h"
-#include <PsyX/PsyX_render.h>
-#include "font_region.h"
-#include "main/fileinfo.h"
-#include "main/fsqueue.h"
 #include "sh_log.h"
 #include "game.h"
 #include "bodyprog/bodyprog.h"
-#include "bodyprog/screen/screen_fade.h"
 #include "bodyprog/screen/screen_data.h"
 #include "screens/options.h"
 #include "bodyprog/screen/screen_draw.h"
-#include <libgpu.h>
 #include "bodyprog/sound/sfx_id_enum.h"
 #include "bodyprog/sound/sound_system.h"
 
@@ -444,197 +436,7 @@ static int s_cachedRu = -1, s_cachedW, s_cachedH;
 static GLuint s_nativeText[64];
 static int s_nativeW[64], s_nativeH[64], s_nativePx[64];
 static char s_nativeStrings[64][512];
-typedef struct {
-    unsigned char* raw;
-    TIM_IMAGE tim;
-} QoDiscFont;
-static QoDiscFont s_discFont, s_latinFont;
-static int s_discRussian=-1;
-static const s_FontLayout* s_discLayout;
 static GLuint qo_upload_rgba(const unsigned char* rgba,int w,int h,int special);
-
-static unsigned qo_font_le32(const unsigned char* p)
-{
-    return p[0]|((unsigned)p[1]<<8)|((unsigned)p[2]<<16)|((unsigned)p[3]<<24);
-}
-
-/* ReadTIM has no size argument. Validate both 4bpp blocks before giving it
- * optional asset data, including the CLUT accessed by the CPU glyph raster. */
-static int qo_font_tim(unsigned char* raw,size_t size,TIM_IMAGE* tim)
-{
-    size_t pos=8;
-    int block;
-    if(size<8 || qo_font_le32(raw)!=0x10 || qo_font_le32(raw+4)!=8)return 0;
-    for(block=0;block<2;block++) {
-        unsigned length,w,h;
-        if(pos>size || size-pos<12)return 0;
-        length=qo_font_le32(raw+pos);
-        w=raw[pos+8]|((unsigned)raw[pos+9]<<8);
-        h=raw[pos+10]|((unsigned)raw[pos+11]<<8);
-        if(length<12 || length>size-pos || !w || !h ||
-           (size_t)w*h>(length-12)/2 || (!block && (size_t)w*h<16))return 0;
-        pos+=length;
-    }
-    OpenTIM((u_long*)raw);
-    return ReadTIM(tim)!=NULL;
-}
-
-static int qo_disc_fonts(void)
-{
-    int russian=Pc_RuActive() || Font_RussianLayoutActive();
-    /* A PC language pack can own a synthetic PAL atlas instead of the disc
-     * TIM. Keep the existing font fallback until that atlas is available here. */
-    if (Font_RussianLayoutActive() && !Pc_RuActive()) return 0;
-    if (s_discFont.raw && (s_discLayout!=g_FontLayout || s_discRussian!=russian)) {
-        free(s_discFont.raw); memset(&s_discFont,0,sizeof(s_discFont));
-    }
-    if (!s_discFont.raw) {
-        const s_FileInfo* info = &g_FileTable[FILE_1ST_FONT16_TIM];
-        s_discFont.raw = Pc_LangReadDiscFile(info->startSector, (unsigned)info->blockCount << 8);
-        if (!s_discFont.raw) return 0;
-        if (!qo_font_tim(s_discFont.raw,(unsigned)info->blockCount<<8,&s_discFont.tim)) {
-            free(s_discFont.raw);memset(&s_discFont,0,sizeof(s_discFont));return 0;
-        }
-        Font_PatchPackGlyphs(s_discFont.tim.paddr,s_discFont.tim.prect->w,s_discFont.tim.prect->h);
-        s_discLayout = g_FontLayout;
-        s_discRussian=russian;
-    }
-    if (!s_latinFont.raw) {
-        FILE* f = fopen("gamedata/font/eur16.tim","rb");
-        if (f) {
-            long n;
-            fseek(f,0,SEEK_END); n=ftell(f); rewind(f);
-            if (n>0 && n<1048576) {
-                s_latinFont.raw=malloc((size_t)n);
-                if (s_latinFont.raw && fread(s_latinFont.raw,1,(size_t)n,f)==(size_t)n) {
-                    if(!qo_font_tim(s_latinFont.raw,(size_t)n,&s_latinFont.tim)) {
-                        free(s_latinFont.raw);memset(&s_latinFont,0,sizeof(s_latinFont));
-                    }
-                } else { free(s_latinFont.raw); s_latinFont.raw=NULL; }
-            }
-            fclose(f);
-        }
-    }
-    return s_discFont.tim.paddr && s_discFont.tim.caddr;
-}
-
-/* Native FONT16 cells, not an approximation using an operating-system font.
- * Latin abbreviations on repainted Russian discs use the shipped retail PAL
- * atlas; Cyrillic uses exactly the mounted translation's glyph mapping. */
-static int qo_disc_glyph(unsigned cp, const QoDiscFont** source, int* cell, int* advance)
-{
-    unsigned b=cp;
-    s_GlyphEmit emits[2];
-    int n;
-    *source=&s_discFont;
-    if (cp==' ' || cp=='_') { *advance=4; return 0; }
-    if(cp==0x419 && Pc_RuActive() && Pc_RuDiscByte(cp)==Pc_RuDiscByte(0x439))cp=0x418;
-    if (cp>=0x400 && cp<=0x4ff) b=Pc_RuActive()?Pc_RuDiscByte(cp):Pc_RuPackByte(cp);
-    if (cp==0x2014 || cp==0x2013) b='-';
-    if (cp==0x00ab || cp==0x00bb || cp==0x201c || cp==0x201d) b='\'';
-    if (cp<128 && s_latinFont.raw) {
-        static const unsigned char widths[84]={
-            3,7,7,11,11,4,10,4,6,10,10,10,10,10,10,10,10,10,10,4,4,
-            10,11,10,8,13,12,12,12,13,11,11,13,12,9,9,12,12,13,12,13,11,
-            13,12,10,11,13,12,12,12,11,12,6,4,6,8,0,3,9,10,9,9,9,
-            7,11,11,6,6,10,6,13,11,10,11,10,8,8,7,10,10,12,10,10,9};
-        *source=&s_latinFont;
-        *cell=(int)b-0x27;
-        *advance=*cell>=0 && *cell<84?widths[*cell]:6;
-        return *cell>=0 && *cell<84;
-    }
-    if (b=='!') b='\\';
-    if (b=='&') b='^';
-    n=Font_MapChar(b,emits);
-    if (n>0) { *cell=emits[n-1].cell; *advance=emits[n-1].advance; return 1; }
-    *advance=5;
-    return 0;
-}
-
-static float qo_disc_width(const char* text,float px)
-{
-    float w=0;
-    if (!qo_disc_fonts()) return 0;
-    while (*text) {
-        const QoDiscFont* source; int cell,advance;
-        qo_disc_glyph(Pc_LangUtf8Next(&text),&source,&cell,&advance);
-        w+=advance*px/16;
-    }
-    return w;
-}
-
-unsigned char* Pc_MenuFontRaster(const char* text,float px,int* outW,int* outH)
-{
-    float pen=1,scale=px/16;
-    int w,h;
-    unsigned char* rgba;
-    /* The native rasterizer implements EN/RU, not PAL accents or CJK. Preserve
-     * the existing Unicode font path for every other active language. */
-    if (Pc_LangSjisActive() || (!Pc_RuActive() && !Font_RussianLayoutActive() &&
-        strcmp(g_PcConfig.languageCode,"en") && strcmp(g_PcConfig.languageCode,"en-us"))) return NULL;
-    if (!text || px<=0 || !outW || !outH) return NULL;
-    w=(int)ceilf(qo_disc_width(text,px)+px+2);h=(int)ceilf(px+4+3*scale);
-    if (!qo_disc_fonts() || w<=0 || w>4096 || h<=0 || h>512) return NULL;
-    rgba=calloc((size_t)w*h,4);
-    if (!rgba) return 0;
-    while (*text) {
-        const QoDiscFont* font;
-        int cell,advance;
-        unsigned cp=Pc_LangUtf8Next(&text);
-        int composeBreve=cp==0x419 && Pc_RuActive() &&
-            Pc_RuDiscByte(0x419)==Pc_RuDiscByte(0x439);
-        if (qo_disc_glyph(composeBreve?0x418:cp,&font,&cell,&advance)) {
-            int stride=font->tim.prect->w*2;
-            int strip=font->tim.prect->w*4>512;
-            int gx=(cell%21)*12+(strip?(cell/21)*256:0);
-            int gy=strip?0:(cell/21)*16;
-            int x,y;
-            const unsigned char* pixels=(const unsigned char*)font->tim.paddr;
-            const unsigned short* palette=(const unsigned short*)font->tim.caddr;
-            for(y=0;y<(int)ceilf(16*scale);y++) for(x=0;x<(int)ceilf(12*scale);x++) {
-                int tx=gx+(int)(x/scale),ty=gy+(int)(y/scale);
-                int dx=(int)pen+x,dy=y+1+(int)ceilf(3*scale),index;
-                unsigned short color;
-                if (dx<0 || dy<0 || dx>=w || dy>=h || tx<0 || ty<0 ||
-                    tx>=stride*2 || ty>=font->tim.prect->h) continue;
-                index=(pixels[ty*stride+tx/2]>>((tx&1)*4))&15;
-                color=palette[index];
-                if (color&0x7fff) {
-                    int a=((color&31)+((color>>5)&31)+((color>>10)&31))*255/93;
-                    unsigned char* p=rgba+(dy*w+dx)*4;
-                    p[0]=p[1]=p[2]=255;
-                    if (a>p[3]) p[3]=(unsigned char)a;
-                }
-            }
-            /* ViTCo painted only lowercase й. Keep the capital И body and
-             * copy its native lowercase breve, rather than shrinking the whole
-             * letter in an uppercase heading. No disc/VRAM atlas is modified. */
-            if(composeBreve) {
-                const QoDiscFont* mark;int mc,ma;
-                if(qo_disc_glyph(0x439,&mark,&mc,&ma)) {
-                    int ms=mark->tim.prect->w*2;
-                    int stripMark=mark->tim.prect->w*4>512;
-                    int mx=(mc%21)*12+(stripMark?(mc/21)*256:0);
-                    int my=stripMark?0:(mc/21)*16;
-                    const unsigned char* mp=(const unsigned char*)mark->tim.paddr;
-                    const unsigned short* cl=(const unsigned short*)mark->tim.caddr;
-                    for(y=0;y<(int)ceilf(3*scale);y++)for(x=0;x<(int)ceilf(12*scale);x++) {
-                        int tx=mx+(int)(x/scale),ty=my+1+(int)(y/scale);
-                        int dx=(int)pen+x,dy=y,index;
-                        if(dx<0||dy<0||dx>=w||dy>=h||tx<0||ty<0||tx>=ms*2||ty>=mark->tim.prect->h)continue;
-                        index=(mp[ty*ms+tx/2]>>((tx&1)*4))&15;
-                        if(cl[index]&0x7fff){unsigned char* p=rgba+(dy*w+dx)*4;
-                            int a=((cl[index]&31)+((cl[index]>>5)&31)+((cl[index]>>10)&31))*255/93;
-                            p[0]=p[1]=p[2]=255;if(a>p[3])p[3]=a;}
-                    }
-                }
-            }
-        }
-        pen+=advance*scale;
-    }
-    *outW=w;*outH=h;
-    return rgba;
-}
 
 static GLuint qo_disc_bake(const char* text,float px,int* outW,int* outH)
 {
@@ -648,23 +450,9 @@ static const char* const s_nativeNames[5][2] = {
     { "Controls", "Управление" }, { "Camera", "Камера" }, { "HUD", "Интерфейс" }
 };
 
-static int qo_russian(void)
-{
-    const char* code = g_PcConfig.languageCode;
-    return Pc_RuActive() || (Pc_LangPackActive() &&
-        code[0] == 'r' && code[1] == 'u' &&
-        (code[2] == 0 || code[2] == '-' || code[2] == '_'));
-}
-
-static int qo_responsive_language(void)
-{
-    return !Pc_LangSjisActive() && (qo_russian() ||
-        !strcmp(g_PcConfig.languageCode,"en") || !strcmp(g_PcConfig.languageCode,"en-us"));
-}
-
 static const char* qo_local(const char* en, const char* ru)
 {
-    return qo_russian() ? ru : en;
+    return Pc_MenuLanguageRussian() ? ru : en;
 }
 
 static const void* qo_handle(const QoRowDef* r)
@@ -1209,7 +997,7 @@ static void qo_fonts_init(void)
         if (stbtt_InitFont(&s_font, data, stbtt_GetFontOffsetForIndex(data, 0)))
         {
             /* Do not silently select a Latin-only fallback on a Russian disc. */
-            if (qo_russian() && (!stbtt_FindGlyphIndex(&s_font, 0x042F) ||
+            if (Pc_MenuLanguageRussian() && (!stbtt_FindGlyphIndex(&s_font, 0x042F) ||
                                 !stbtt_FindGlyphIndex(&s_font, 0x044F))) {
                 free(data);
                 continue;
@@ -1236,8 +1024,8 @@ static GLuint qo_bake_once(const char* text, float px, int* outW, int* outH, int
     unsigned char *cov, *rgba, *scratch;
     GLuint tex;
 
-    if (!s_native && qo_responsive_language() && text && text[0] && px>=4 &&
-        Pc_LangQuickScript()==LANG_QUICK_SCRIPT_LATIN && qo_disc_fonts()) {
+    if (!s_native && Pc_MenuLanguageSupported() && text && text[0] && px>=4 &&
+        Pc_LangQuickScript()==LANG_QUICK_SCRIPT_LATIN && Pc_MenuFontReady()) {
         if (outInk) *outInk=0;
         return qo_disc_bake(text,px,outW,outH);
     }
@@ -1640,7 +1428,7 @@ static void qo_row_name(const QoRowDef* r, char* out, int n)
     {
         const void* h = qo_handle(r);
         const PcOptionHelp* help = Pc_OptionsHelp(r->key);
-        src = s_native && help ? help->name[qo_russian()] :
+        src = s_native && help ? help->name[Pc_MenuLanguageRussian()] :
             h ? Pc_LangQuickMenu(PcOpt_QuickName(h)) : r->key;
     }
     else if (r->kind == ROW_CHEAT)
@@ -1766,7 +1554,7 @@ void Pc_QuickOptions_Toggle(void)
         /* The same five pages in gameplay, with an isolated showcase instead
          * of rendering or advancing the player's paused world. Other languages
          * retain their existing translated quick menu. */
-        if (qo_responsive_language() &&
+        if (Pc_MenuLanguageSupported() &&
             g_GameWork.gameState==GameState_InGame && g_SysWork.sysState==SysState_Gameplay &&
             !(g_SysWork.sysFlags & (SysFlag_CutsceneActive|SysFlag_DemoActive))) {
             s_quickPage=s_page; s_quickSel=s_sel;
@@ -2196,8 +1984,8 @@ int Pc_OptionsScreen_Update(void)
 
     /* Draw initializes GL in its own context; allow the legacy screen for the
      * first frame, and permanently if initialization fails. */
-    if (!qo_responsive_language() ||
-        s_glReady < 0 || (s_fontsTried && !s_fontOk && !qo_disc_fonts())) {
+    if (!Pc_MenuLanguageSupported() ||
+        s_glReady < 0 || (s_fontsTried && !s_fontOk && !Pc_MenuFontReady())) {
         extern int g_PcOptionsWideScreen;
         g_PcOptionsWideScreen = 0;
         if (s_native) {
@@ -2248,8 +2036,8 @@ int Pc_OrdinaryOptions_Active(void)
 {
     int step=g_GameWork.gameStateSteps[0];
     return g_GameWork.gameState==GameState_OptionScreen && s_glReady==1 &&
-        qo_responsive_language() &&
-        qo_disc_fonts() && (step==OptionsMenuState_MainOptions ||
+        Pc_MenuLanguageSupported() &&
+        Pc_MenuFontReady() && (step==OptionsMenuState_MainOptions ||
         step==OptionsMenuState_EnterMainOptions || step==OptionsMenuState_LeavePcOptions ||
         step==OptionsMenuState_Leave || step==OptionsMenuState_LeaveMainOptions ||
         step==OptionsMenuState_EnterScreenPos || step==OptionsMenuState_EnterBrightness ||
@@ -2264,19 +2052,7 @@ int Pc_OptionsOverlay_Active(void)
 
 int Pc_TitleMenu_Active(void)
 {
-    extern int Pc_TitleMenu_Rows(int*,int*,int*);
-    int ids[6],selected,difficulty;
-    return s_glReady==1 && qo_responsive_language() &&
-        qo_disc_fonts() && Pc_TitleMenu_Rows(ids,&selected,&difficulty)>0;
-}
-
-int Pc_TitleMenu_MouseRow(int count)
-{
-    float x,y;
-    if(!Pc_MouseCursor_ViewportPos(&x,&y) || x<.28f || x>.72f)return -1;
-    float pitch=count>5?.038f:.047f;
-    int row=(int)floorf((y-.61f)/pitch);
-    return y>=.61f && row>=0 && row<count?row:-1;
+    return s_glReady==1 && Pc_TitleScreen_Available();
 }
 
 int Pc_OrdinaryOptions_Mouse(int* row,float* valueFraction)
@@ -2324,7 +2100,7 @@ void Pc_QuickOptions_PreloadGL(void)
  * game's FONT16 letterforms. Scene previews are render-only, not screenshots. */
 static float qo_text_width(const char* text, float px)
 {
-    if (s_native && qo_disc_fonts()) return qo_disc_width(text,px);
+    if (s_native && Pc_MenuFontReady()) return Pc_MenuFontWidth(text,px);
     const char* p = text;
     float width = 0, scale = stbtt_ScaleForPixelHeight(&s_font, px);
     int previous = 0;
@@ -2351,7 +2127,7 @@ static void qo_native_text(int slot, const char* text, float px, float x, float 
         qo_retire(s_nativeText[slot]);
         snprintf(s_nativeStrings[slot], sizeof(s_nativeStrings[slot]), "%s", text);
         s_nativePx[slot] = fit;
-        s_nativeText[slot] = qo_disc_fonts() ?
+        s_nativeText[slot] = Pc_MenuFontReady() ?
             qo_disc_bake(text,(float)fit,&s_nativeW[slot],&s_nativeH[slot]) :
             qo_bake(text, (float)fit, &s_nativeW[slot], &s_nativeH[slot]);
     }
@@ -2405,7 +2181,7 @@ static void qo_native_draw(float vpW, float vpH, const QoRowDef* rows, int count
     float listT = l.top+header;
     float listH = l.height-header-footer;
     float rowPitch, helpX, helpY, helpW, bottom = l.top+l.height-footer;
-    int i, ru=qo_russian();
+    int i, ru=Pc_MenuLanguageRussian();
     if (l.stacked) listH *= .58f;
     rowPitch = listH / 11;
     helpX = l.stacked ? l.left : l.left+l.listWidth+l.gap;
@@ -2490,7 +2266,8 @@ static void qo_native_draw(float vpW, float vpH, const QoRowDef* rows, int count
     qo_native_text(28,s_previewOnly ? qo_local("Mouse: click / wheel    Esc: return    Tab: extended quick menu", "Мышь: щелчок / колесо    Esc: назад    Tab: расширенное быстрое меню") : qo_local("Mouse: hover and click / wheel    Esc / Back: return    Restart-only: resolution / MSAA", "Мышь: наведение, щелчок / колесо    Esc: назад    Перезапуск: разрешение / MSAA"),l.font*.70f,l.left,bottom+l.font*1.9f,l.width,vpW,vpH,.62f,.65f,.68f);
 }
 
-static void qo_title_image_tint(GLuint texture,float x,float y,float w,float h,
+/* Borrowed by title composition; this owns shader/VBO submission, not assets. */
+static void qo_image_tint(GLuint texture,float x,float y,float w,float h,
                                 float vpW,float vpH,float r,float g,float b,float opacity)
 {
     float v[6][4]={{-1+2*x/vpW,1-2*y/vpH,0,0},
@@ -2503,183 +2280,6 @@ static void qo_title_image_tint(GLuint texture,float x,float y,float w,float h,
     glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(v),v);glDrawArrays(GL_TRIANGLES,0,6);
 }
 
-static void qo_title_image(GLuint texture,float x,float y,float w,float h,
-                           float vpW,float vpH,float brightness,float opacity)
-{
-    qo_title_image_tint(texture,x,y,w,h,vpW,vpH,brightness,brightness,brightness,opacity);
-}
-
-/* Reconstruct the original palette image once, in linear-sized pixels, before
- * GPU scaling. A conservative cubic filter softens enlarged stair-steps without
- * inventing replacement art or changing the original logo/font designs. */
-static float qo_title_cubic(float a,float b,float c,float d,float t)
-{
-    return b+.5f*t*(c-a+t*(2*a-5*b+4*c-d+t*(3*(b-c)+d-a)));
-}
-
-static unsigned char* qo_title_reconstruct(const unsigned char* src,int w,int h)
-{
-    unsigned char* out=malloc((size_t)w*h*16);
-    int x,y,c,j,k;
-    if(!out)return NULL;
-    for(y=0;y<h*2;y++)for(x=0;x<w*2;x++) {
-        float sx=(x+.5f)*.5f-.5f,sy=(y+.5f)*.5f-.5f;
-        int ix=(int)floorf(sx),iy=(int)floorf(sy);
-        for(c=0;c<3;c++) {
-            float col[4];
-            for(j=0;j<4;j++) {
-                float row[4];int yy=iy+j-1;if(yy<0)yy=0;if(yy>=h)yy=h-1;
-                for(k=0;k<4;k++) {int xx=ix+k-1;if(xx<0)xx=0;if(xx>=w)xx=w-1;
-                    row[k]=src[(yy*w+xx)*4+c];}
-                col[j]=qo_title_cubic(row[0],row[1],row[2],row[3],sx-ix);
-            }
-            float v=qo_title_cubic(col[0],col[1],col[2],col[3],sy-iy);
-            out[(y*w*2+x)*4+c]=(unsigned char)fminf(255,fmaxf(0,v));
-        }
-        out[(y*w*2+x)*4+3]=255;
-    }
-    return out;
-}
-
-static GLuint qo_title_png(const char* name,int* width,int* height)
-{
-    int comp;GLuint tex=0;
-    long length=0;
-    unsigned char* file=qo_read_file(name,&length);
-    unsigned char* data=file?stbi_load_from_memory(file,(int)length,width,height,&comp,4):NULL;
-    free(file);
-    if(!data)return 0;
-    glGenTextures(1,&tex);glBindTexture(GL_TEXTURE_2D,tex);glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,*width,*height,0,GL_RGBA,GL_UNSIGNED_BYTE,data);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    stbi_image_free(data);return tex;
-}
-
-static void qo_title_draw(float w,float h)
-{
-    static GLuint texture;
-    static GLuint wideTexture;
-    static int wideW,wideH,wideTried;
-    static GLuint sides[2];
-    static GLuint labels[20],fogTexture;
-    static int labelW[20],labelH[20];
-    static int style=-99;
-    int pal=Pc_TitleUsesPalLogo(),tw=320,th=pal?96:480;
-    int ids[6],selected,difficulty,count,i;
-    extern int Pc_TitleMenu_Rows(int*,int*,int*);
-    static const char* names[][2]={{"LOAD","ЗАГРУЗКА"},{"CONTINUE","ДАЛЕЕ"},
-        {"START","СТАРТ"},{"OPTION","ОПЦИИ"},{"ACHIEVEMENTS","ДОСТИЖЕНИЯ"},{"EXIT","ВЫХОД"}};
-    static const char* levels[][2]={{"EASY","ЛЕГКО"},{"NORMAL","НОРМА"},{"HARD","ТРУДНО"}};
-    float px=h*.034f,artW=h*4/3.f,artH=h;
-    float artX=(w-artW)*.5f,artY=0;
-    int ru=qo_russian();
-    if(!texture || style!=Pc_TitleStyle()) {
-        unsigned short raw[160*480],clut[256];
-        unsigned char* rgba=malloc((size_t)tw*th*4);
-        if(!rgba)return;
-        GR_ReadVRAM(raw,pal?896:864,0,pal?80:160,th);
-        GR_ReadVRAM(clut,g_TitleImg.clutX,g_TitleImg.clutY,pal?16:256,1);
-        for(i=0;i<tw*th;i++) {
-            int c=clut[pal?((raw[i/4]>>((i%4)*4))&15):((raw[i/2]>>((i%2)*8))&255)];
-            rgba[i*4]=(c&31)*255/31;rgba[i*4+1]=((c>>5)&31)*255/31;
-            rgba[i*4+2]=((c>>10)&31)*255/31;rgba[i*4+3]=255;
-        }
-        if(texture)glDeleteTextures(1,&texture);
-        int highW,highH;
-        texture=qo_title_png(pal?"gamedata/menu-hd/title-pal.png":
-            Pc_TitleUsesJpArt()?"gamedata/menu-hd/title-jp.png":"gamedata/menu-hd/title-us.png",&highW,&highH);
-        if(!texture) {
-            glGenTextures(1,&texture);
-            glBindTexture(GL_TEXTURE_2D,texture);glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-            unsigned char* smooth=qo_title_reconstruct(rgba,tw,th);
-            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,smooth?tw*2:tw,smooth?th*2:th,0,GL_RGBA,GL_UNSIGNED_BYTE,smooth?smooth:rgba);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-            free(smooth);
-        }
-        if(wideTexture)glDeleteTextures(1,&wideTexture);
-        wideTexture=0;wideTried=0;
-        free(rgba);style=Pc_TitleStyle();
-    }
-    GLuint artTexture=texture;
-    if(!pal && !Pc_TitleUsesJpArt() && w/h>=1.55f) {
-        if(!wideTried) {
-            wideTried=1;
-            wideTexture=qo_title_png("gamedata/menu-hd/title-us-wide.png",&wideW,&wideH);
-        }
-        if(wideTexture && wideH>0) {
-            artTexture=wideTexture;
-            artW=h*(float)wideW/wideH;
-        }
-    }
-    /* Contain the chosen composition: never squeeze it or crop its logo. The
-     * separate 4:3 and widescreen assets can switch immediately on resize. */
-    if(artW>w) {artH*=w/artW;artW=w;}
-    artX=(w-artW)*.5f;artY=(h-artH)*.5f;
-    qo_native_rect(0,0,w,h,w,h,0,0,0,1);
-    if(pal)qo_title_image(texture,artX,h*.19f,artW,artW*.15f,w,h,1,1);
-    else {
-        /* Fill only the extra side area with dim, blurred unlettered edges.
-         * The complete central composition is neither stretched nor cropped. */
-        if(artX>0 && !Pc_TitleUsesJpArt()) {
-            int sw,sh;
-            if(!sides[0])sides[0]=qo_title_png("gamedata/menu-hd/side-left.png",&sw,&sh);
-            if(!sides[1])sides[1]=qo_title_png("gamedata/menu-hd/side-right.png",&sw,&sh);
-            if(sides[0])qo_title_image(sides[0],0,0,artX,h,w,h,.65f,1);
-            if(sides[1])qo_title_image(sides[1],w-artX,0,artX,h,w,h,.65f,1);
-        }
-        qo_title_image(artTexture,artX,artY,artW,artH,w,h,1,1);
-    }
-    /* Retail fog simulation is still advanced by MainMenu_FogUpdate. Upload
-     * its current vertex colours, not a canned image, over the same lower band. */
-    {
-        unsigned char rgb[441*3],rgba[21*12*4];
-        extern void Pc_TitleFogRgb(unsigned char*);
-        Pc_TitleFogRgb(rgb);
-        for(i=0;i<21*12;i++) {
-            memcpy(rgba+i*4,rgb+(9*21+i)*3,3);rgba[i*4+3]=255;
-        }
-        if(!fogTexture) {
-            glGenTextures(1,&fogTexture);glBindTexture(GL_TEXTURE_2D,fogTexture);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,21,12,0,GL_RGBA,GL_UNSIGNED_BYTE,rgba);
-        } else {glBindTexture(GL_TEXTURE_2D,fogTexture);
-            glTexSubImage2D(GL_TEXTURE_2D,0,0,0,21,12,GL_RGBA,GL_UNSIGNED_BYTE,rgba);}
-        /* PSX tpage 42 uses ABR=1 (additive), not an opaque fog photograph. */
-        glBlendFunc(GL_ONE,GL_ONE);
-        qo_title_image(fogTexture,0,h*232/448.f,w,h*264/448.f,w,h,.5f,1);
-        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    }
-    count=Pc_TitleMenu_Rows(ids,&selected,&difficulty);
-    for(i=0;i<count;i++) {
-        int active=ids[i]==selected,idx=difficulty?6+ids[i]:ids[i];
-        if(ru)idx+=9;
-        float y=h*(.61f+i*(count>5?.038f:.047f));
-        float r=active?48/255.f:.83f,g=active?1:.83f,b=active?80/255.f:.83f;
-        const char* text=difficulty?levels[ids[i]][ru]:names[ids[i]][ru];
-        if(!labels[idx]) {char file[96];snprintf(file,sizeof(file),"gamedata/menu-hd/label-%02d.png",idx);
-            labels[idx]=qo_title_png(file,&labelW[idx],&labelH[idx]);}
-        if(labels[idx]) {
-            float lh=px*labelH[idx]/64.f,lw=px*labelW[idx]/64.f;
-            qo_title_image_tint(labels[idx],(w-lw)/2,y,lw,lh,w,h,r,g,b,1);
-        } else {
-            float lw=qo_text_width(text,px);
-            qo_native_text(3+i,text,px,(w-lw)/2,y,w*.6f,w,h,r,g,b);
-        }
-    }
-    /* The GL compositor is after the PSX fade, so reproduce its intensity. */
-    float fade=1-Screen_FadeInProgressGet()/4096.f;
-    if(fade>0)qo_native_rect(0,0,w,h,w,h,0,0,0,fminf(fade,1));
-}
-
 static void qo_ordinary_draw(float w,float h)
 {
     static const char* const names[][2]={
@@ -2690,7 +2290,7 @@ static void qo_ordinary_draw(float w,float h)
         {"Effects volume","Громкость эффектов"},{"Voice volume","Громкость речи"}};
     const char* sound[]={"Auto","Stereo","Quad","5.1","7.1","HRTF"};
     const char* soundRu[]={"Авто","Стерео","Квадро","5.1","7.1","HRTF"};
-    int i,ru=qo_russian();float px=fminf(h/900*28,48);
+    int i,ru=Pc_MenuLanguageRussian();float px=fminf(h/900*28,48);
     qo_native_rect(0,0,w,h,w,h,0,0,0,1);
     qo_native_text(0,qo_local("OPTIONS","ОПЦИИ"),px*1.3f,w*.10f,h*.075f,w*.6f,w,h,.83f,.85f,.83f);
     for(i=0;i<MainOptionsMenuEntry_Count;i++) {
@@ -2846,9 +2446,9 @@ void Pc_QuickOptions_Draw(void)
     qo_gl_pump();
     qo_validate_cache();
 
-    if (s_cachedRu != qo_russian() || s_cachedW != (int)vpW || s_cachedH != (int)vpH) {
+    if (s_cachedRu != Pc_MenuLanguageRussian() || s_cachedW != (int)vpW || s_cachedH != (int)vpH) {
         qo_free_text();
-        s_cachedRu = qo_russian();
+        s_cachedRu = Pc_MenuLanguageRussian();
         s_cachedW = (int)vpW;
         s_cachedH = (int)vpH;
     }
@@ -2867,7 +2467,12 @@ void Pc_QuickOptions_Draw(void)
         glBlendEquation(GL_FUNC_ADD);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
-        if(title) {int wasNative=s_native;s_native=1;qo_title_draw(vpW,vpH);s_native=wasNative;}
+        if(title) {
+            const PcTitlePainter painter={vpW,vpH,qo_image_tint,qo_native_rect,qo_native_text};
+            int wasNative=s_native;s_native=1;
+            Pc_TitleScreen_Draw(&painter);
+            s_native=wasNative;
+        }
         else if(ordinary) {int wasNative=s_native;s_native=1;qo_ordinary_draw(vpW,vpH);s_native=wasNative;}
         else qo_native_draw(vpW,vpH,rows,nRows);
         goto restore;

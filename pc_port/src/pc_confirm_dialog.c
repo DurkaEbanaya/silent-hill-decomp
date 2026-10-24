@@ -29,7 +29,7 @@
 #include "pc_confirm_dialog.h"
 #include "pc_mouse_cursor.h"
 #include "lang_quick.h"
-#include "pc_quick_options.h"
+#include "pc_menu_font.h"
 #include "sh_log.h"
 
 #define CD_GARBAGE 16

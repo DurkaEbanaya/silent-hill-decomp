@@ -101,6 +101,23 @@ those platforms still need build/runtime review.
 
 ## Build and review
 
+### Module boundaries
+
+- `pc_menu_font.c` owns CPU FONT16 loading/validation, glyph mapping, measurement
+  and rasterization. It has no GL or quick-menu state dependency. Confirmation
+  and binding panels consume `pc_menu_font.h` directly, not the quick-menu API.
+- `pc_title_screen.c` owns title image/label textures, art layout and live-fog
+  composition. Its small painter interface borrows image/rectangle/text drawing;
+  it does not access the compositor's atlas, shader, VBO or quick-menu state.
+  Asset loading, background, fog and entry composition have separate lifecycles.
+- `pc_quick_options.c` retains settings input, shared GL-state save/restore and
+  atlas submission. Title composition is one delegated draw operation.
+- `pc_menu_preview.c` owns the separate showcase processes and IPC; it does not
+  own the title assets or font buffers.
+
+These boundaries reduce cross-feature dependencies; they do not make a large
+rendering/UI change automatically safe or guarantee zero coupling warnings.
+
 This depends on [PsyCross PR #22](https://github.com/SlickAmogus/PsyCross/pull/22): full-viewport presentation and
 pointer coordinates for responsive overlays, neutral UI post-processing, hidden
 worker windows and an optional pre-swap capture callback. The parent repository's

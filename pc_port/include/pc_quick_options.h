@@ -50,11 +50,4 @@ int Pc_OptionsScenePreview(void);
 int Pc_OrdinaryOptions_Active(void);
 int Pc_OptionsOverlay_Active(void);
 int Pc_OrdinaryOptions_Mouse(int* row, float* valueFraction);
-int Pc_TitleMenu_Active(void);
-int Pc_TitleMenu_MouseRow(int count);
-
-/* Rasterize one UTF-8 line with the mounted game's FONT16 letterforms.
- * Caller owns returned RGBA pixels. No GL state changes. */
-unsigned char* Pc_MenuFontRaster(const char* text,float px,int* width,int* height);
-
 #endif /* PC_QUICK_OPTIONS_H */

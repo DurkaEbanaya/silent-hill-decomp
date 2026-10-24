@@ -12,7 +12,7 @@
 #include "pc_mouse_cursor.h"
 #include "pc_native_menu_draw.h"
 #include "pc_retroachievements.h"
-#include "pc_quick_options.h"
+#include "pc_title_screen.h"
 #endif
 
 #include <psyq/libetc.h>
