@@ -42,4 +42,19 @@ int  Pc_QuickOptions_ShowsMinimapRows(void);
 /* Per-frame draw from the post-capture GL hook (cheap no-op while closed). */
 void Pc_QuickOptions_Draw(void);
 
+/* Responsive replacement for Options > PC Options. Returns 0 if the GL
+ * renderer is unavailable, so the original menu remains a safe fallback. */
+int Pc_OptionsScreen_Update(void);
+int Pc_OptionsScenePreview(void);
+/* Main (non-PC) options retain their original control/state machine. */
+int Pc_OrdinaryOptions_Active(void);
+int Pc_OptionsOverlay_Active(void);
+int Pc_OrdinaryOptions_Mouse(int* row, float* valueFraction);
+int Pc_TitleMenu_Active(void);
+int Pc_TitleMenu_MouseRow(int count);
+
+/* Rasterize one UTF-8 line with the mounted game's FONT16 letterforms.
+ * Caller owns returned RGBA pixels. No GL state changes. */
+unsigned char* Pc_MenuFontRaster(const char* text,float px,int* width,int* height);
+
 #endif /* PC_QUICK_OPTIONS_H */
