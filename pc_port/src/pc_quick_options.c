@@ -1646,6 +1646,11 @@ static void qo_row_name(const QoRowDef* r, char* out, int n)
         src = s_native && help ? help->name[Pc_MenuLanguageRussian()] : (r->label != NULL) ? Pc_LangQuickMenu(r->label)
                                  : (h ? Pc_LangQuickMenu(PcOpt_QuickName(h)) : r->key);
     }
+    else if(s_native && r->kind==ROW_PAGE)
+        src=r->cpage<0?qo_local("Previous category","Предыдущий раздел"):
+                       qo_local("Next category","Следующий раздел");
+    else if(s_native && r->kind==ROW_CLOSE)
+        src=qo_local("Back","Назад");
     else if (r->kind == ROW_CHEAT)
         src = Pc_LangQuick(Pc_Cheats_Name(r->cpage, r->extra));
     else if (r->kind == ROW_ACTION && r->extra == QO_A_TOTITLE && qo_totitle_live())
