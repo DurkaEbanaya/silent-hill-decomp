@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Runs without a game disc: real SDL/OpenGL context plus packaged examples. */
+#define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <PsyX/common/glad.h>
 #include <stdio.h>
@@ -24,6 +25,7 @@ int main(int argc,char** argv)
     GLuint pbo,oldTexture;
     GLint value;
     int i;
+    SDL_SetMainReady();
     assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)==0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,2);

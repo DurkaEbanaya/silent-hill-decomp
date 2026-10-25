@@ -1,4 +1,7 @@
-# Responsive menus and isolated graphics previews
+# Responsive menus and baked graphics examples
+
+This cross-platform validation branch contains the later mobile/baked revision,
+not the earlier Linux live-worker design in PR #180. Existing PRs are unchanged.
 
 This change replaces the English/Russian PC-options, ordinary-options and title
 presentation without replacing the existing option adjustment/config-save APIs.
@@ -9,7 +12,9 @@ map, save/load or all other original screens.
 
 - Five PC-options categories: Graphics, Lighting & System, Controls, Camera, HUD.
 - Responsive label/value column and a separate, wrapped explanation column.
-- English and Russian descriptions for all 40 current PC settings.
+- English and Russian descriptions, including mobile-only options (53 help keys).
+- Mobile: six category tabs, larger fixed-size typography, inertial vertical
+  scrolling, category swipes, explicit Back controls and a larger example pane.
 - Native game FONT16 letterforms: mounted Russian-disc mapping for Cyrillic,
   existing shipped PAL font for Latin. ViTCo uppercase Й is composed from its
   native И and breve; the disc and VRAM font are not modified.
@@ -38,6 +43,7 @@ step. Optional PNGs are loaded once, not once per frame:
 | --- | --- |
 | `title-us.png` | Full US-style composition, normally 4:3 display aspect |
 | `title-us-wide.png` | Wide composition, used when window aspect is >= 1.55 |
+| `title-us-ultrawide.png` | User-supplied wider composition for aspect >= 1.95 |
 | `title-pal.png` | PAL logo strip, not a full background |
 | `title-jp.png` | Optional Japanese full composition |
 | `side-left.png`, `side-right.png` | Dim edge fill outside contained US art |
@@ -61,43 +67,33 @@ files does not grant a new license over them. AI-assisted processing is disclose
 not represented as original hand-painted HD artwork. The background changes are
 isolated in a separate commit so maintainers can drop them independently.
 
-## Linux graphics showcase
+## Baked graphics examples
 
-The preview is real game rendering in a **disposable second process**, not a
-simulation of the player's save or a filter applied to a static screenshot:
+The normal menu uses `pc_baked_preview.c` on every platform. It does not launch a
+second game process or alter the player's world to make an example. The earlier
+Linux worker and diagnostic FBO/mesh/TIM modules remain as development references;
+the normal menu does not call their live-preview entry points.
 
-- School (`map1_s00`): geometry/filter/lighting/camera examples, Harry with a pipe
-  and flashlight.
-- Street (`map2_s00`): fog; the same cached worker animates actual precipitation
-  for the weather setting.
-- Nonvisual or unsupported settings have no misleading example. Resolution,
-  MSAA, HUD, input and some camera actions are not demonstrated.
+`gamedata/previews/manifest.tsv` contains 493 variants for 18 settings, referencing
+641 PNGs. This includes all integer FOV values 40–140 for FPS/TPS/OTS and separate
+30/60 Hz precipitation loops. The images were captured offline from the real game
+in independent temporary runtimes with an owned disc; other parameters are fixed.
+Flashlight-shadow examples include an actual NPC caster because Harry and his
+held weapon are excluded from the game's shadow-caster pass.
 
-Rendering is 640x360. At most two workers are retained while the menu is open.
-Static scenes settle over four frames and sleep until settings change. Weather
-animates at up to 60 rendered frames/s. The school scene preloads asynchronously
-on PC-options/F10 entry, not at game launch or in ordinary options. First load is
-still nonzero and hardware-dependent; reopening after close loads again.
+Values without an exact sample use the nearest variant, explicitly labelled as an
+example rather than an exact live rendering of all current settings. Unsupported
+effects retain descriptions and an honest unavailable-example message. See
+`BAKED-PREVIEWS-AUDIT.md` for the full coverage/missing-effects list and provenance
+JSON for file hashes and capture limitations. Weather loops reset after one second;
+display refresh/render rate can limit the visible cadence.
 
-Each worker gets a private 0700 directory, a 0600 shared-memory file, the existing
-map-module directory and a read-only-use link to the mounted image. It does not
-share player memory cards, config, plugins or account files. It starts a fresh
-showcase game, disables achievements/Discord/plugins/randomizer, uses dummy audio,
-hides its window and excludes physical controllers. Inherited nonstandard file
-descriptors are closed at spawn. This is **process separation, not an OS sandbox**:
-map libraries still execute native code and have the user's normal permissions.
-
-The renderer freezes showcase events/AI after warmup and advances only weather
-when needed. GPU readback happens outside the shared lock. Heartbeat publication
-is independent of that lock; a worker exits after 60 seconds without its owner.
-Closing the menu signals owned workers without blocking on GPU shutdown; child
-reaping is nonblocking. Normal exit removes only exact private files, never linked
-assets. Abrupt process termination may leave private temporary files behind.
-
-Set `SH_MENU_PREVIEW_DISABLE=1` to disable workers. The settings UI stays usable
-and reports preview unavailable. Windows/macOS builds currently have no worker
-backend and show that fallback. The UI/asset loading is otherwise portable C/GL;
-those platforms still need build/runtime review.
+The player validates manifest paths, entry/frame counts, PNG dimensions, file size
+and a 32 MiB decoded-frame budget. Frames are decoded only when the variant changes;
+animation changes the texture on its playback tick without repeated PNG decoding.
+Closing the menu releases the current decoded frames and GL texture. A real SDL/GL
+test exercises texture upload, all 303 FOV values, both weather loops, nearest/missing
+lookup, unpack-state restoration and close/reopen without needing a game disc.
 
 ## Build and review
 
@@ -112,8 +108,8 @@ those platforms still need build/runtime review.
   Asset loading, background, fog and entry composition have separate lifecycles.
 - `pc_quick_options.c` retains settings input, shared GL-state save/restore and
   atlas submission. Title composition is one delegated draw operation.
-- `pc_menu_preview.c` owns the separate showcase processes and IPC; it does not
-  own the title assets or font buffers.
+- `pc_baked_preview.c` owns manifest lookup, bounded image decoding, animation
+  playback and the current example texture. It has no game-world callbacks.
 
 These boundaries reduce cross-feature dependencies; they do not make a large
 rendering/UI change automatically safe or guarantee zero coupling warnings.
@@ -152,12 +148,11 @@ and an image you own. Do not use a live playthrough for destructive reset tests.
    six title rows visible, verify mouse hits still match the denser row pitch.
 3. Test keyboard, mouse hover/click/wheel and the configured controller. Enter
    PC options and return repeatedly: no legacy list should appear in transition.
-4. On an initial nonvisual row, wait for hidden school preload. It must not take
-   keyboard focus. Select lighting/PGXP, then fog, weather, and school again.
-   Static scenes should stop rendering once settled; weather should animate.
-5. Toggle PGXP repeatedly without destroying/restarting the worker. Close/reopen
-   immediately and after both scenes have loaded; verify no visible child window
-   and no surviving worker after closing. Test `SH_MENU_PREVIEW_DISABLE=1`.
+4. Select PGXP, lighting, fog, FOV and precipitation examples. Each must match its
+   labelled sample value; changing unrelated settings must not pretend to change
+   the baked image. Missing effects must show their description/fallback.
+5. Close/reopen repeatedly and switch between static images and both weather loops.
+   Confirm no child process is started and example memory/texture are released.
 6. From normal gameplay, F10 must preserve player position, health, timer and
    event flags. Close and resume movement; reopen and use Tab to reach the old
    extended quick menu. Num+/Shift+= should act once per press, not during
