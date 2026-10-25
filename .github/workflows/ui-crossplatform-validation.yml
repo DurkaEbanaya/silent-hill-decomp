@@ -42,12 +42,19 @@ jobs:
             mingw-w64-x86_64-SDL2
             mingw-w64-x86_64-openal
             mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-mesa
       - name: Build and test Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON
           cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
+          # Hosted Windows runners have no guaranteed modern hardware ICD.
+          # Exercise real GL calls through Mesa llvmpipe, not a skipped/mock test.
+          cp /mingw64/bin/opengl32.dll /mingw64/bin/libgallium_wgl.dll build-ui/
+          export SDL_OPENGL_LIBRARY="$PWD/build-ui/opengl32.dll"
+          export GALLIUM_DRIVER=llvmpipe
+          export LIBGL_ALWAYS_SOFTWARE=1
           if ! ctest --test-dir build-ui -R '^pc_' --output-on-failure; then
             (cd build-ui && gdb -q -batch -ex run -ex bt --args ./pc_baked_preview_gl_test.exe)
             exit 1

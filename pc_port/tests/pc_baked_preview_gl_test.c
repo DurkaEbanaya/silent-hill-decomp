@@ -38,9 +38,11 @@ int main(int argc,char** argv)
     context=SDL_GL_CreateContext(window);
     if(!context){fprintf(stderr,"SDL GL: %s\n",SDL_GetError());return 1;}
     puts("GL context created");
-    assert(gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress));
+    int loaded=gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
+    if(!loaded){fprintf(stderr,"GL loader failed: %s\n",SDL_GetError());return 1;}
     if(!glGetString || !glGenBuffers || !glGenTextures || !glGetIntegerv || !glPixelStorei) {
-        fputs("Required GL entry point missing\n",stderr);return 1;
+        fprintf(stderr,"Required GL entry point missing (string=%d buffers=%d textures=%d integers=%d pixelstore=%d)\n",
+            glGetString!=NULL,glGenBuffers!=NULL,glGenTextures!=NULL,glGetIntegerv!=NULL,glPixelStorei!=NULL);return 1;
     }
     printf("GL backend: %s\n",glGetString(GL_VERSION));
     glGenBuffers(1,&pbo);glBindBuffer(GL_PIXEL_UNPACK_BUFFER,pbo);
