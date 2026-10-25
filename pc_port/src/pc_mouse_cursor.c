@@ -20,6 +20,9 @@
 #include "pc_quick_options.h"
 #include <libgs.h>
 
+/* Responsive GL menus request the pointer independently of PSX primitives. */
+void Pc_MouseCursor_Show(void) { Pc_MouseCursor_Draw(); }
+
 /* Menu rows are authored via Gfx_StringSetPosition(x, y), a center-origin space
  * whose reference is (OFFSET_X, OFFSET_Y). The overlay OT draw origin is the
  * framebuffer centre (gsScreenWidth/2, gsScreenHeight/2). The framebuffer HEIGHT

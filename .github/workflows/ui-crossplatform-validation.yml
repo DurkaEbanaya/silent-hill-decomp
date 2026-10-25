@@ -1,0 +1,115 @@
+name: UI cross-platform validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test/ui-crossplatform-validation]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake pkg-config libsdl2-dev libopenal-dev libjpeg-dev libgl1-mesa-dev libglu1-mesa-dev xvfb
+      - name: macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install gcc cmake ninja pkg-config sdl2 openal-soft jpeg-turbo
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-openal
+            mingw-w64-x86_64-libjpeg-turbo
+      - name: Build and test Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF
+          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test -j 3
+          ctest --test-dir build-ui -R '^pc_' --output-on-failure
+      - name: Build and test Unix desktop
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          args=()
+          if [ "$RUNNER_OS" = macOS ]; then
+            gcc=$(find /opt/homebrew/bin -name 'gcc-[0-9]*' -type f -o -name 'gcc-[0-9]*' -type l | sort -V | tail -1)
+            args+=(-DCMAKE_C_COMPILER="$gcc" -DOPENAL_LIBRARY="$(brew --prefix openal-soft)/lib/libopenal.dylib" -DOPENAL_INCLUDE_DIR="$(brew --prefix openal-soft)/include" -DJPEG_LIBRARY="$(brew --prefix jpeg-turbo)/lib/libjpeg.dylib" -DJPEG_INCLUDE_DIR="$(brew --prefix jpeg-turbo)/include")
+          fi
+          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF "${args[@]}"
+          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test -j 3
+          ctest --test-dir build-ui -R '^pc_' --output-on-failure
+      - name: Validate packaged examples
+        shell: python
+        run: |
+          from pathlib import Path
+          import hashlib, json, struct
+          root=Path('build-ui/gamedata/previews')
+          manifest=root/'manifest.tsv'
+          rows=[line.split() for line in manifest.read_text().splitlines() if line and not line.startswith('#')]
+          assert len(rows)<=1024
+          hashes=json.loads((root/'provenance.json').read_text())['files']
+          for key,value,frames,fps,pattern in rows:
+              frames=int(frames); fps=int(fps)
+              assert 1<=frames<=60 and 1<=fps<=60
+              for i in range(frames):
+                  name=pattern%i if frames>1 else pattern
+                  data=(root/name).read_bytes()
+                  assert data[:8]==b'\x89PNG\r\n\x1a\n'
+                  w,h=struct.unpack('>II',data[16:24])
+                  assert w*h*4*frames<=32*1024*1024
+                  assert hashlib.sha256(data).hexdigest()==hashes[name]
+          print('Validated',len(rows),'packaged example variants; no disc required')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: UI-validation-${{ runner.os }}
+          path: |
+            build-ui/Testing/Temporary/LastTest.log
+            build-ui/SilentHillPC*
+          if-no-files-found: ignore
+
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: brew install cmake ninja llvm
+      - run: echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+      - name: Build unsigned device IPA
+        run: CMAKE_BUILD_PARALLEL_LEVEL=3 bash ios_port/build_ios.sh
+      - name: Check bundle assets and device platform
+        run: |
+          APP=$(find build-ios -maxdepth 4 -name 'SilentHill.app' -type d | head -1)
+          test -f "$APP/gamedata/previews/manifest.tsv"
+          test -f "$APP/gamedata/menu-hd/title-us-ultrawide.png"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$APP/Info.plist")" = iPhoneOS
+          file "$APP/SilentHill"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UI-validation-iOS-unsigned
+          path: build-ios/SilentHill-unsigned.ipa
+          if-no-files-found: error

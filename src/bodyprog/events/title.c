@@ -8,6 +8,9 @@
 #include "map_registry.h"
 #include "lang_text.h" /* menu translations + width for recentred entries */
 #include "pc_title_style.h"
+#include "pc_title_screen.h"
+#include "pc_title_screen.h"
+#include "pc_mouse_cursor.h"
 #include "main/fileinfo.h" /* g_GameRegion: PAL repositions the achievements hint */
 #endif
 
@@ -31,6 +34,7 @@
  * NDK compiler) rejects it. */
 void func_8003B560(void);
 void MainMenu_FogUpdate(void);
+static u32 func_8003B7FC(s32 idx);
 
 #ifdef SH_PC_PORT
 /* Forward declarations for static functions used before definition */
@@ -49,6 +53,8 @@ static void func_8003BCF4(void);
 void func_8003B560(void);
 
 void MainMenu_FogUpdate(void);
+static int s_TitleDifficulty;
+static u32 func_8003B7FC(s32 idx);
 
 #define MAIN_MENU_FOG_COUNT 21
 
@@ -70,6 +76,26 @@ static s32 g_MainMenu_SelectedEntry     = MainMenuEntry_Start;
 #endif
 
 static u32 g_MainMenu_VisibleEntryFlags = MAINMENU_BASE_ENTRY_FLAGS;
+
+#ifdef SH_PC_PORT
+int Pc_TitleMenu_Rows(int* ids,int* selected,int* difficulty)
+{
+    int i,n=0;
+    extern int Pc_RaBrowser_IsOpen(void);
+    if(Pc_RaBrowser_IsOpen())return 0;
+    if(g_GameWork.gameState!=GameState_MainMenu || g_PcConfig.skipIntros>=2)return 0;
+    *difficulty=g_MainMenuState==MenuState_DifficultySelector;
+    *selected=g_MainMenu_SelectedEntry;
+    if(*difficulty){*selected=s_TitleDifficulty;for(i=0;i<3;i++)ids[n++]=i;return n;}
+    for(i=0;i<MainMenuEntry_Count;i++)if(g_MainMenu_VisibleEntryFlags&(1<<i))ids[n++]=i;
+    return n;
+}
+void Pc_TitleFogRgb(unsigned char* rgb)
+{
+    int i;for(i=0;i<441;i++){u32 c=D_800BCDE0?func_8003B7FC(i):0;
+        rgb[i*3]=c&255;rgb[i*3+1]=(c>>8)&255;rgb[i*3+2]=(c>>16)&255;}
+}
+#endif
 
 // ========================================
 // GLOBAL VARIABLES
@@ -344,8 +370,12 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 extern int Pc_MouseCursor_MenuRowHover(int, int, int, unsigned int, int*);
                 extern int Pc_MouseCursor_Moved(void);
                 int mcClicked = 0;
-                int mcRow     = Pc_MouseCursor_MenuRowHover(184, 20, MainMenuEntry_Count,
-                                                            g_MainMenu_VisibleEntryFlags, &mcClicked);
+                int mcRow;
+                if(Pc_TitleMenu_Active()) {
+                    int ids[6],selected,difficulty,n=Pc_TitleMenu_Rows(ids,&selected,&difficulty);
+                    int row=Pc_TitleMenu_MouseRow(n);mcRow=row>=0?ids[row]:-1;
+                    mcClicked=Pc_MouseCursor_LeftClicked();
+                } else mcRow=Pc_MouseCursor_MenuRowHover(184,20,MainMenuEntry_Count,g_MainMenu_VisibleEntryFlags,&mcClicked);
                 if (mcRow >= 0)
                 {
                     if (mcClicked)
@@ -471,7 +501,8 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
                 extern int Pc_MouseCursor_Moved(void);
                 extern int Pc_MouseCursor_RightClicked(void);
                 int mcClicked = 0;
-                int mcRow     = Pc_MouseCursor_MenuRowHover(204, 20, 3, ~0u, &mcClicked);
+                int mcRow = Pc_TitleMenu_Active()?Pc_TitleMenu_MouseRow(3):Pc_MouseCursor_MenuRowHover(204,20,3,~0u,&mcClicked);
+                if(Pc_TitleMenu_Active())mcClicked=Pc_MouseCursor_LeftClicked();
                 if (mcRow >= 0)
                 {
                     if (mcClicked)
@@ -777,6 +808,9 @@ void func_8003B560(void) {} // 0x8003B560
  * here. */
 static void MainMenu_AchievementHintDraw(void)
 {
+#if defined(__ANDROID__) || defined(SH_IOS)
+    if(Pc_TitleMenu_Active())return;
+#endif
     /* Authoring space on this screen runs y -112 (top) .. 336 (bottom), x 0 ..
      * 320; the menu column sits at x158, y184..264.
      *
@@ -859,6 +893,7 @@ static void MainMenu_AchievementHintDraw(void)
 
 static void MainMenu_MainTextDraw(void) // 0x8003B568
 {
+    if(Pc_TitleMenu_Active())return;
     #define COLUMN_POS_X 158
     #define COLUMN_POS_Y 184
     #define STR_OFFSET_Y 20
@@ -928,6 +963,8 @@ static void MainMenu_MainTextDraw(void) // 0x8003B568
 
 static void MainMenu_DifficultyTextDraw(s32 idx) // 0x8003B678
 {
+    s_TitleDifficulty=idx;
+    if(Pc_TitleMenu_Active())return;
     #define DIFFICULTY_MENU_SELECTION_COUNT 3
     #define COLUMN_POS_X                    158
     #define COLUMN_POS_Y                    204
