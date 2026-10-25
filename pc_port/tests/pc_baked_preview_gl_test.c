@@ -15,8 +15,9 @@
 /* assert must be active in RelWithDebInfo too. */
 #include <assert.h>
 
-int main(void)
+int main(int argc,char** argv)
 {
+    (void)argc;(void)argv;
     SDL_Window* window;
     SDL_GLContext context;
     PcBakedPreview image;
