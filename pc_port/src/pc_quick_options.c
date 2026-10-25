@@ -698,7 +698,20 @@ static const char* qo_page_title(int page)
 #else /* desktop: the sections ARE the pages */
 
 #define qo_page_count()   QO_PAGES
-#define qo_page_rows      qo_section_rows
+static const QoRowDef* qo_page_rows(int page,int* count)
+{
+    if(!s_native)return qo_section_rows(page,count);
+    static QoRowDef rows[QO_MAX_ROWS];int i;
+    *count=PcOpt_ScreenCount(page);
+    if(*count>QO_MAX_ROWS)*count=QO_MAX_ROWS;
+    for(i=0;i<*count;i++) {
+        const void* h=PcOpt_ScreenEntry(page,i);
+        int action=PcOpt_ScreenAction(h);
+        rows[i]=(QoRowDef){action==2?ROW_CLOSE:action?ROW_PAGE:ROW_OPT,
+            PcOpt_ScreenKey(h),i,PcOpt_QuickName(h),action};
+    }
+    return rows;
+}
 #define qo_page_title(p)  (s_pageTitles[p])
 
 #endif
