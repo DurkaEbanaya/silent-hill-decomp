@@ -82,6 +82,25 @@ jobs:
           gradle --version | head -8
           ls "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk"
 
+      # Players update by installing the new APK over the old one, which Android
+      # only allows when both carry the same signature; otherwise they must
+      # uninstall first, and that deletes the app's data folder (saves and disc
+      # image). Published APKs are signed with the maintainer's debug key, so CI
+      # signs with that same key, kept in the ANDROID_DEBUG_KEYSTORE secret
+      # (base64). Without it Gradle generates a throwaway key and the APK is
+      # kept off the realtime release.
+      - name: Maintainer debug key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
+            echo "MAINTAINER_SIGNED=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_DEBUG_KEYSTORE is not set; this APK has a throwaway signature and will not be published to the realtime release."
+          fi
+
       - name: Build
         # The script takes its JDK and gradle from these, which is how it runs
         # unchanged off a Windows machine.
@@ -123,7 +142,7 @@ jobs:
       # build-windows.yml creates it). One fixed name, replaced on every push:
       # only the newest Android build is kept there.
       - name: Replace the .apk on the realtime release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/android-port'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/android-port' && env.MAINTAINER_SIGNED == '1'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
