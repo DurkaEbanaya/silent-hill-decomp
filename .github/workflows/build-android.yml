@@ -94,9 +94,14 @@ jobs:
           KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
-            mkdir -p "$HOME/.android"
-            echo "$KEYSTORE_B64" | base64 -d > "$HOME/.android/debug.keystore"
-            echo "MAINTAINER_SIGNED=1" >> "$GITHUB_ENV"
+            # AGP takes the debug keystore from ANDROID_USER_HOME when it is set,
+            # not ~/.android, and the runner's own value won the first time, so
+            # pin it rather than guess which folder the image uses.
+            KDIR="$RUNNER_TEMP/android-user-home"
+            mkdir -p "$KDIR"
+            echo "$KEYSTORE_B64" | base64 -d > "$KDIR/debug.keystore"
+            echo "ANDROID_USER_HOME=$KDIR" >> "$GITHUB_ENV"
+            echo "MAINTAINER_KEYSTORE=$KDIR/debug.keystore" >> "$GITHUB_ENV"
           else
             echo "::warning::ANDROID_DEBUG_KEYSTORE is not set; this APK has a throwaway signature and will not be published to the realtime release."
           fi
@@ -129,6 +134,25 @@ jobs:
           echo "both ABIs present"
           echo "=== unstripped library sizes per ABI ==="
           find android_port/app/build/intermediates/cxx -name libmain.so -exec ls -la {} +
+
+      # The upload below is gated on this, so an APK that would force players to
+      # uninstall (and lose their saves) can never reach the realtime release.
+      - name: Check the APK carries the maintainer's signature
+        if: env.MAINTAINER_KEYSTORE != ''
+        run: |
+          set -eu
+          APK=android_port/app/build/outputs/apk/debug/app-debug.apk
+          want=$(keytool -list -v -keystore "$MAINTAINER_KEYSTORE" -storepass android \
+                 | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ':' | tr 'A-F' 'a-f')
+          got=$(keytool -printcert -jarfile "$APK" \
+                | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ':' | tr 'A-F' 'a-f')
+          echo "keystore $want"
+          echo "apk      $got"
+          if [ -n "$want" ] && [ "$want" = "$got" ]; then
+            echo "MAINTAINER_SIGNED=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::APK signature does not match the maintainer key; not publishing it."
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
