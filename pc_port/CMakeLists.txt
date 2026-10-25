@@ -1115,4 +1115,22 @@ if(BUILD_TESTING)
     add_executable(pc_preview_tim_test tests/pc_preview_tim_test.c src/pc_preview_tim.c)
     target_include_directories(pc_preview_tim_test PRIVATE include)
     add_test(NAME pc_preview_tim_test COMMAND pc_preview_tim_test)
+    option(SH_UI_GL_TEST "Build disc-free SDL/OpenGL baked-example validation" OFF)
+    if(SH_UI_GL_TEST AND NOT ANDROID AND NOT IOS)
+        add_executable(pc_baked_preview_gl_test
+            tests/pc_baked_preview_gl_test.c src/pc_baked_preview.c
+            "${PSYCROSS_DIR}/src/render/glad.c")
+        target_include_directories(pc_baked_preview_gl_test PRIVATE
+            include "${PSYCROSS_DIR}/include" ${SDL2_INCLUDE_DIRS})
+        target_link_libraries(pc_baked_preview_gl_test PRIVATE SDL2::SDL2)
+        if(TARGET SDL2::SDL2main)
+            target_link_libraries(pc_baked_preview_gl_test PRIVATE SDL2::SDL2main)
+        endif()
+        if(UNIX)
+            target_link_libraries(pc_baked_preview_gl_test PRIVATE ${CMAKE_DL_LIBS} m)
+        endif()
+        add_test(NAME pc_baked_preview_gl_test COMMAND pc_baked_preview_gl_test)
+        set_tests_properties(pc_baked_preview_gl_test PROPERTIES
+            WORKING_DIRECTORY "$<TARGET_FILE_DIR:SilentHillPC>")
+    endif()
 endif()

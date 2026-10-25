@@ -45,8 +45,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF
-          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test -j 3
+          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON
+          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
           ctest --test-dir build-ui -R '^pc_' --output-on-failure
       - name: Build and test Unix desktop
         if: runner.os != 'Windows'
@@ -57,9 +57,13 @@ jobs:
             gcc=$(find /opt/homebrew/bin -name 'gcc-[0-9]*' -type f -o -name 'gcc-[0-9]*' -type l | sort -V | tail -1)
             args+=(-DCMAKE_C_COMPILER="$gcc" -DOPENAL_LIBRARY="$(brew --prefix openal-soft)/lib/libopenal.dylib" -DOPENAL_INCLUDE_DIR="$(brew --prefix openal-soft)/include" -DJPEG_LIBRARY="$(brew --prefix jpeg-turbo)/lib/libjpeg.dylib" -DJPEG_INCLUDE_DIR="$(brew --prefix jpeg-turbo)/include")
           fi
-          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF "${args[@]}"
-          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test -j 3
-          ctest --test-dir build-ui -R '^pc_' --output-on-failure
+          cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON "${args[@]}"
+          cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
+          if [ "$RUNNER_OS" = Linux ]; then
+            LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a ctest --test-dir build-ui -R '^pc_' --output-on-failure
+          else
+            ctest --test-dir build-ui -R '^pc_' --output-on-failure
+          fi
       - name: Validate packaged examples
         shell: python
         run: |
