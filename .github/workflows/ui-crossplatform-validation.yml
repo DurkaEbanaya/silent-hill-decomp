@@ -35,6 +35,7 @@ jobs:
           update: true
           install: >-
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gdb
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
@@ -47,7 +48,10 @@ jobs:
         run: |
           cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON
           cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
-          ctest --test-dir build-ui -R '^pc_' --output-on-failure
+          if ! ctest --test-dir build-ui -R '^pc_' --output-on-failure; then
+            (cd build-ui && gdb -q -batch -ex run -ex bt --args ./pc_baked_preview_gl_test.exe)
+            exit 1
+          fi
       - name: Build and test Unix desktop
         if: runner.os != 'Windows'
         shell: bash

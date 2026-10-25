@@ -19,6 +19,8 @@
 int main(int argc,char** argv)
 {
     (void)argc;(void)argv;
+    setvbuf(stdout,NULL,_IONBF,0);setvbuf(stderr,NULL,_IONBF,0);
+    puts("Starting SDL/GL preview test");
     SDL_Window* window;
     SDL_GLContext context;
     PcBakedPreview image;
@@ -27,6 +29,7 @@ int main(int argc,char** argv)
     int i;
     SDL_SetMainReady();
     assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)==0);
+    puts("SDL initialized");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE);
@@ -34,7 +37,11 @@ int main(int argc,char** argv)
     if(!window){fprintf(stderr,"SDL window: %s\n",SDL_GetError());return 1;}
     context=SDL_GL_CreateContext(window);
     if(!context){fprintf(stderr,"SDL GL: %s\n",SDL_GetError());return 1;}
+    puts("GL context created");
     assert(gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress));
+    if(!glGetString || !glGenBuffers || !glGenTextures || !glGetIntegerv || !glPixelStorei) {
+        fputs("Required GL entry point missing\n",stderr);return 1;
+    }
     printf("GL backend: %s\n",glGetString(GL_VERSION));
     glGenBuffers(1,&pbo);glBindBuffer(GL_PIXEL_UNPACK_BUFFER,pbo);
     glBufferData(GL_PIXEL_UNPACK_BUFFER,16,NULL,GL_STATIC_DRAW);
