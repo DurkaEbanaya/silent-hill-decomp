@@ -261,17 +261,13 @@ static void title_draw_entries(const PcTitlePainter* painter)
     px=h*size;
     for(i=0;i<count;i++) {
         int active=ids[i]==selected,idx=difficulty?6+ids[i]:ids[i];
-#if defined(__ANDROID__) || defined(SH_IOS)
-        /* Android's original menu has Exit at ID 4, not Achievements. */
+        /* This branch's shared menu enum has Exit at ID 4 on every platform. */
         if(!difficulty && ids[i]==4)idx=5;
-#endif
         if(ru)idx+=9;
         float y=h*(top+i*pitch);
         float r=active?48/255.f:.83f,g=active?1:.83f,b=active?80/255.f:.83f;
         const char* text=difficulty?levels[ids[i]][ru]:names[ids[i]][ru];
-#if defined(__ANDROID__) || defined(SH_IOS)
         if(!difficulty && ids[i]==4)text=names[5][ru];
-#endif
         if(!s_assets.labels[idx]) {char file[96];snprintf(file,sizeof(file),"gamedata/menu-hd/label-%02d.png",idx);
             s_assets.labels[idx]=title_png(file,&s_assets.labelW[idx],&s_assets.labelH[idx]);}
         if(s_assets.labels[idx]) {
