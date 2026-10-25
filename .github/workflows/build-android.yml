@@ -32,6 +32,8 @@ concurrency:
 jobs:
   build:
     if: github.repository == 'SlickAmogus/silent-hill-decomp'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
@@ -64,10 +66,15 @@ jobs:
       - name: Point the build at this runner's SDK
         run: echo "sdk.dir=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" > android_port/local.properties
 
+      # validate-wrappers off: the build runs this Gradle, never a wrapper, and
+      # the only wrapper jars in the tree belong to SDL's vendored sample project
+      # (SDL/android-project). Their checksum is not on Gradle's published list,
+      # which failed every run at this step since 2026-10-11 before any compile.
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+          validate-wrappers: false
 
       - name: Toolchain versions
         run: |
@@ -111,3 +118,15 @@ jobs:
           path: android_port/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 90
+
+      # Newest build on the rolling `realtime` pre-release (pc-port's
+      # build-windows.yml creates it). One fixed name, replaced on every push:
+      # only the newest Android build is kept there.
+      - name: Replace the .apk on the realtime release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/android-port'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android_port/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/SilentHill-android.apk"
+          gh release upload realtime "$RUNNER_TEMP/SilentHill-android.apk" --clobber --repo "$GITHUB_REPOSITORY"
