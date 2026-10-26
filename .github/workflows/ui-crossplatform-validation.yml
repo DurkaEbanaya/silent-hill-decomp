@@ -55,10 +55,12 @@ jobs:
           cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON
           cmake --build build-ui --target SilentHillPC pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
           # Hosted Windows runners have no guaranteed modern hardware ICD.
-          # Exercise real GL calls through Mesa llvmpipe, not a skipped/mock test.
+          # Exercise real GL calls through Mesa softpipe, not a skipped/mock test.
+          # llvmpipe passed all preview checks but hung in SDL_DestroyWindow on
+          # this hosted runner; test the non-JIT driver with full cleanup too.
           cp /mingw64/bin/opengl32.dll /mingw64/bin/libgallium_wgl.dll build-ui/
           export SDL_OPENGL_LIBRARY="$(cygpath -w "$PWD/build-ui/opengl32.dll")"
-          export GALLIUM_DRIVER=llvmpipe
+          export GALLIUM_DRIVER=softpipe
           export LIBGL_ALWAYS_SOFTWARE=1
           export LP_NUM_THREADS=2
           export SH_PREVIEW_TRACE=1
