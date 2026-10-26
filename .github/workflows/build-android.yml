@@ -179,7 +179,11 @@ jobs:
           set -euo pipefail
           R="$GITHUB_REPOSITORY"
           cp "$SRC" "$RUNNER_TEMP/$FIXED"
-          gh release upload realtime "$RUNNER_TEMP/$FIXED" --clobber --repo "$R"
+          # The label names the build: the app's update check (AppUpdate.java)
+          # reads "(build <sha>, <commit unix time>)" from it and offers this APK
+          # only when that commit is newer than its own.
+          LABEL="$FIXED (build $GITHUB_SHA, $(git log -1 --format=%ct "$GITHUB_SHA"))"
+          gh release upload realtime "$RUNNER_TEMP/$FIXED#$LABEL" --clobber --repo "$R"
           gh release view realtime-history --repo "$R" >/dev/null 2>&1 ||
             gh release create realtime-history --repo "$R" --prerelease --latest=false \
               --title "Realtime history (older builds)" --notes "Older automatic builds." || true

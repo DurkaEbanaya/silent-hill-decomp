@@ -3,8 +3,12 @@ package com.silenthill.port;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -21,6 +25,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -834,7 +839,176 @@ public class SetupActivity extends Activity {
         return null;
     }
 
+    /**
+     * The update check, when check_updates allows it, then the game. Asked
+     * before the bundled files are staged: an update brings its own, and the
+     * new version stages them on its first launch.
+     */
     private void launchGame() {
+        final File root = StorageLocations.resolve(this);
+
+        if (root == null || !AppUpdate.enabled(root)) {
+            continueLaunch();
+            return;
+        }
+
+        showMessage("Checking for updates...");
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final AppUpdate.Offer offer = AppUpdate.check();
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (offer == null) continueLaunch();
+                        else askToUpdateApp(root, offer);
+                    }
+                });
+            }
+        }, "SH update check").start();
+    }
+
+    /** A bare line of text, for the moments before the game takes the screen. */
+    private void showMessage(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(Color.LTGRAY);
+        t.setGravity(Gravity.CENTER);
+        t.setBackgroundColor(Color.BLACK);
+        setContentView(t);
+    }
+
+    private void askToUpdateApp(final File root, final AppUpdate.Offer offer) {
+        String when = java.text.DateFormat.getDateTimeInstance(
+            java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+            .format(new java.util.Date(offer.commitTime * 1000L));
+
+        new AlertDialog.Builder(this)
+            .setTitle("Update available")
+            .setMessage("A newer build of the game is available (" + when + ", "
+                      + offer.sha.substring(0, Math.min(9, offer.sha.length())) + ", "
+                      + (offer.size / (1024 * 1024)) + " MB).\n\n"
+                      + "Download and install it now? Your saves, settings and disc "
+                      + "image are kept.")
+            .setCancelable(false)
+            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    downloadUpdate(offer);
+                }
+            })
+            .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    continueLaunch();
+                }
+            })
+            .setNeutralButton("Don't ask again", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    AppUpdate.disable(root);
+                    Toast.makeText(SetupActivity.this,
+                        "Update checks are off. Turn them back on in Options.",
+                        Toast.LENGTH_LONG).show();
+                    continueLaunch();
+                }
+            })
+            .show();
+    }
+
+    private BroadcastReceiver installReceiver;
+
+    private void downloadUpdate(final AppUpdate.Offer offer) {
+        final ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(1000);
+        final TextView label = new TextView(this);
+        label.setText("Downloading the update...");
+        label.setTextColor(Color.LTGRAY);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setBackgroundColor(Color.BLACK);
+        int pad = (int) (32 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, pad);
+        box.addView(label);
+        box.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                                                       LinearLayout.LayoutParams.WRAP_CONTENT));
+        setContentView(box);
+
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final File apk = AppUpdate.download(SetupActivity.this, offer, new AppUpdate.Progress() {
+                    private int last = -1;
+                    @Override public void onProgress(final long done, final long total) {
+                        final int permille = (total > 0) ? (int) (done * 1000 / total) : 0;
+                        if (permille == last) return;
+                        last = permille;
+                        runOnUiThread(new Runnable() {
+                            @Override public void run() { bar.setProgress(permille); }
+                        });
+                    }
+                });
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { installUpdate(apk); }
+                });
+            }
+        }, "SH update download").start();
+    }
+
+    private void installUpdate(File apk) {
+        if (apk == null) {
+            updateFailed("The update could not be downloaded.");
+            return;
+        }
+
+        installReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context ctx, Intent intent) {
+                int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+                if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                    Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                    if (confirm != null) {
+                        startActivity(confirm);
+                        return;
+                    }
+                }
+                if (status == PackageInstaller.STATUS_SUCCESS) {
+                    return; /* the system replaces this process */
+                }
+                Log.w(TAG, "update: install status " + status + " "
+                         + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
+                updateFailed(status == PackageInstaller.STATUS_FAILURE_ABORTED
+                             ? "The update was not installed." : "The update could not be installed.");
+            }
+        };
+        IntentFilter filter = new IntentFilter(AppUpdate.ACTION_STATUS);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(installReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(installReceiver, filter);
+        }
+
+        showMessage("Installing the update...");
+        if (!AppUpdate.install(this, apk)) {
+            updateFailed("The update could not be installed.");
+        }
+    }
+
+    /** Never strands the player: whatever went wrong, the current version plays. */
+    private void updateFailed(String why) {
+        if (installReceiver != null) {
+            try { unregisterReceiver(installReceiver); } catch (IllegalArgumentException ignored) { }
+            installReceiver = null;
+        }
+        Toast.makeText(this, why, Toast.LENGTH_LONG).show();
+        continueLaunch();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (installReceiver != null) {
+            try { unregisterReceiver(installReceiver); } catch (IllegalArgumentException ignored) { }
+            installReceiver = null;
+        }
+        super.onDestroy();
+    }
+
+    private void continueLaunch() {
         final File root = StorageLocations.resolve(this);
         final List<String> outdated =
             (root != null) ? BundledAssets.stage(this, root) : new ArrayList<String>();

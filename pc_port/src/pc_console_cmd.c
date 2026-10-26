@@ -518,6 +518,7 @@ static const char* const HELP_LINES[] = {
     " fmv <name|#>   play a movie (also intro1-2, end1-5)",
     " kf [n]         keyframe viewer: toggle, or view frame n",
     " playas [name]  play as another character (bare = list)",
+    " skinini        re-read the character models' .ini files",
     " minimapnomap [0|1]  minimap before the map is found: 0 hide, 1 empty panel",
     " bind <key> <cmd>[;<cmd>...]  run console commands from a key",
     " bind list / unbind <key> / unbindall",
@@ -1966,6 +1967,13 @@ void Pc_ConsoleExec(const char* line)
         else if (arg[0] == '0') g_PsxPgxpWorldDepth = 0;
         else g_PsxPgxpWorldDepth = !g_PsxPgxpWorldDepth;
         cprintf("PGXP world depth channel: %s", g_PsxPgxpWorldDepth ? "ON" : "OFF");
+    } else if (strcmp(cmd, "PGXPACTORDEPTH") == 0) {
+        /* OFF gives each character prim one flat depth again. */
+        extern int g_PsxPgxpActorDepth;
+        if (arg[0] == '1') g_PsxPgxpActorDepth = 1;
+        else if (arg[0] == '0') g_PsxPgxpActorDepth = 0;
+        else g_PsxPgxpActorDepth = !g_PsxPgxpActorDepth;
+        cprintf("PGXP character depth: %s", g_PsxPgxpActorDepth ? "ON" : "OFF");
     } else if (strcmp(cmd, "PGXPWALLBIAS") == 0) {
         /* Writer-side far-push margin M (SZ units) on world geometry. */
         extern int g_PsxPgxpWorldFarBias;
@@ -2134,6 +2142,14 @@ void Pc_ConsoleExec(const char* line)
         else if (arg[0] == '0') g_PsxWorldDepthAlways = 0;
         else g_PsxWorldDepthAlways = !g_PsxWorldDepthAlways;
         cprintf("world depth: %s", g_PsxWorldDepthAlways ? "ALWAYS (paint order)" : "LEQUAL (nearer wins)");
+    } else if (strcmp(cmd, "MIXSHADER") == 0) {
+        /* mixshader 0|1 -- A/B for the all-format PSX program, which lets
+         * prims of different texture formats share one draw call. */
+        extern int g_PsxMixedShader;
+        if (arg[0] == '1') g_PsxMixedShader = 1;
+        else if (arg[0] == '0') g_PsxMixedShader = 0;
+        else g_PsxMixedShader = !g_PsxMixedShader;
+        cprintf("mixed-format shader: %s", g_PsxMixedShader ? "ON (fewer draw calls)" : "OFF (one program per format)");
     } else if (strcmp(cmd, "FLMODE") == 0) {
         /* flmode 0..3 | classic | classicshadows | modern | modernshadows */
         int mode = g_PcConfig.flashlightMode;
@@ -2382,6 +2398,9 @@ void Pc_ConsoleExec(const char* line)
             cprintf("keyframe viewer %s (keyframe %d / %d)",
                     g_DebugAnimKfView ? "ON" : "OFF", g_DebugAnimKf, maxKf);
         }
+    } else if (strcmp(cmd, "SKININI") == 0) {
+        extern int Pc_SkinChara_ReloadSettings(void);
+        cprintf("re-read %d character .ini file(s)", Pc_SkinChara_ReloadSettings());
     } else if (strcmp(cmd, "PLAYAS") == 0) {
         extern int         Pc_PlayAs_SetByName(const char* name, int save);
         extern int         Pc_PlayAs_Current(void);

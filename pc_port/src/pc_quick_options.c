@@ -87,7 +87,7 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        QO_X_SPU,
        QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE,
        QO_X_CAMSTYLE, QO_X_OTSSIDE, QO_X_CROSSHAIRSTYLE,
-       QO_X_LINEGAP };
+       QO_X_LINEGAP, QO_X_CHARALIGHT, QO_X_PPLIGHT, QO_X_HEROLIGHT };
 extern const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz);
 extern void        PcOpt_QuickExtraAdjust(int which, int dir);
 extern void        PcOpt_QuickViewReset(int mode);
@@ -98,8 +98,9 @@ extern const char* const PC_PGXP_FOG_TITLE;
 extern const char* const PC_PGXP_FOG_MSG;
 #endif
 
+#define QO_X_QUICK_WEAPONS 1000
 #define QO_GARBAGE  48
-#define QO_MAX_ROWS 18
+#define QO_MAX_ROWS 20
 /* CONTROLS is appended last, so every existing section index -- and the "Next
  * page (X)" label baked into each table -- stays where it was. Its rows differ
  * by platform (s_page5 / s_pageControls). */
@@ -203,6 +204,9 @@ static const QoRowDef s_page0[] = {
      * page is at its row limit, and this is a look you judge by watching it. */
     { ROW_EXTRA, NULL, QO_X_DREAMBLUR,      "Dream Blur" },
     { ROW_EXTRA, NULL, QO_X_DREAMSTR,       "Dream Blur Strength" },
+    { ROW_EXTRA, NULL, QO_X_CHARALIGHT,     "Character Lighting" },
+    { ROW_EXTRA, NULL, QO_X_PPLIGHT,        "Per-Pixel Lighting" },
+    { ROW_EXTRA, NULL, QO_X_HEROLIGHT,      "Hero Light" },
     { ROW_OPT,   "bullet_decals",        0, NULL },
 #if defined(QO_MOBILE)
     /* Frame cap, beside Weather_Rate for the same reason the Options menu puts
@@ -734,9 +738,9 @@ static int s_sel;
  * owns input/timing. The quick menu retains its own page and selection. */
 static int s_quickPage, s_quickSel;
 static int s_cachedRu = -1, s_cachedW, s_cachedH;
-static GLuint s_nativeText[64];
-static int s_nativeW[64], s_nativeH[64], s_nativePx[64];
-static char s_nativeStrings[64][512];
+static GLuint s_nativeText[96];
+static int s_nativeW[96], s_nativeH[96], s_nativePx[96];
+static char s_nativeStrings[96][512];
 static GLuint qo_upload_rgba(const unsigned char* rgba,int w,int h,int special);
 static GLuint qo_disc_bake(const char* text,float px,int* outW,int* outH)
 {
@@ -766,7 +770,6 @@ static GLuint s_prog, s_vao, s_vbo;
 static GLint  s_locColor;
 static int    s_glReady;
 static GLuint s_texWhite;
-static GLuint s_texCursor;
 static GLuint s_garbage[QO_GARBAGE];
 static int    s_garbageCount;
 
@@ -1494,12 +1497,9 @@ static void qo_free_text(void)
      *
      * EVERY handle held outside this function has to be dropped with them,
      * or it keeps pointing at a slot index that now belongs to a different
-     * image. The cursor is the one that is not in the loops below: after a
-     * page change it drew a label's pixels, then vanished once the index
-     * fell past the live slot count. Only slot 0, the white texel, survives
-     * a reset, because qo_atlas_reset re-claims it in place. */
+     * image. Only slot 0, the white texel, survives a reset, because
+     * qo_atlas_reset re-claims it in place. */
     qo_atlas_reset();
-    s_texCursor = 0; /* re-uploaded on the next draw */
     memset(s_nativeText, 0, sizeof(s_nativeText));
     qo_retire(s_texTitle); s_texTitle = 0;
     qo_retire(s_texHint);  s_texHint  = 0;
@@ -1616,7 +1616,6 @@ static void qo_validate_cache(void)
     qo_validate(&s_texTitle,  "title");
     qo_validate(&s_texHint,   "hint");
     qo_validate(&s_texWhite,  "white");
-    qo_validate(&s_texCursor, "cursor");
     for (i = 0; i < QO_MAX_ROWS; i++)
     {
         qo_validate(&s_texLabel[i], "label");
@@ -1688,7 +1687,11 @@ static void qo_row_value(const QoRowDef* r, char* out, int n)
     }
     else if (r->kind == ROW_EXTRA)
     {
-        snprintf(out, (size_t)n, "%s", PcOpt_QuickExtraLabel(r->extra, buf, (int)sizeof(buf)));
+        if (r->extra == QO_X_QUICK_WEAPONS) {
+            extern int g_PcQuickWeaponsEnabled;
+            snprintf(out, (size_t)n, "%s", g_PcQuickWeaponsEnabled ? "On" : "Off");
+        } else
+            snprintf(out, (size_t)n, "%s", PcOpt_QuickExtraLabel(r->extra, buf, (int)sizeof(buf)));
     }
     else if (r->kind == ROW_CHEAT)
     {
@@ -1892,7 +1895,17 @@ static void qo_activate(const QoRowDef* r, int dir)
             if (h) PcOpt_QuickAdjust(h, dir);
             break;
         }
-        case ROW_EXTRA: PcOpt_QuickExtraAdjust(r->extra, dir); break;
+        case ROW_EXTRA:
+            if (r->extra == QO_X_QUICK_WEAPONS) {
+                extern int g_PcQuickWeaponsEnabled;
+                extern void PcConfig_SaveKeyValues(const char* const*, const char* const*, int);
+                const char* key = "quick_weapon_switch";
+                const char* value;
+                g_PcQuickWeaponsEnabled = !g_PcQuickWeaponsEnabled;
+                value = g_PcQuickWeaponsEnabled ? "1" : "0";
+                PcConfig_SaveKeyValues(&key, &value, 1);
+            } else PcOpt_QuickExtraAdjust(r->extra, dir);
+            break;
         case ROW_CHEAT: Pc_Cheats_Adjust(r->cpage, r->extra, dir); break;
         case ROW_PAGE:
             qo_beep(Sfx_MenuMove);
@@ -2601,7 +2614,7 @@ static void qo_native_text(int slot, const char* text, float px, float x, float 
 {
     int fit = (int)px;
     float width;
-    if (!text || !*text || maxWidth <= 0 || slot < 0 || slot >= 64) return;
+    if (!text || !*text || maxWidth <= 0 || slot < 0 || slot >= 96) return;
     width = qo_text_width(text, px);
     if (width > maxWidth) fit = (int)(px * maxWidth / width);
     if (fit < 6) fit = 6;
@@ -2883,10 +2896,10 @@ static void qo_native_draw(float vpW, float vpH, const QoRowDef* rows, int count
             qo_native_rect(l.left,y+rowPitch*.88f,l.listWidth,1,vpW,vpH,48/255.f,1,80/255.f,pulse);
             qo_native_text(62,">",l.font*.65f,l.left-l.padding*.7f,y+rowPitch*.35f,l.padding,vpW,vpH,48/255.f,1,80/255.f);
         }
-        qo_native_text(3+i*2,label,fminf(l.font,rowPitch*.63f),l.left+l.padding,y+rowPitch*.25f,l.listWidth*.70f-l.padding*2,vpW,vpH,i==s_sel?48/255.f:.82f,i==s_sel?1:.84f,i==s_sel?80/255.f:.82f);
+        qo_native_text(64+i*2,label,fminf(l.font,rowPitch*.63f),l.left+l.padding,y+rowPitch*.25f,l.listWidth*.70f-l.padding*2,vpW,vpH,i==s_sel?48/255.f:.82f,i==s_sel?1:.84f,i==s_sel?80/255.f:.82f);
         value[0] = 0;
         if (rows[i].kind == ROW_OPT) qo_row_value(&rows[i],value,sizeof(value));
-        qo_native_text(4+i*2,value,fminf(l.font*.9f,rowPitch*.60f),l.left+l.listWidth*.72f,y+rowPitch*.27f,l.listWidth*.28f-l.padding,vpW,vpH,i==s_sel?48/255.f:.82f,i==s_sel?1:.84f,i==s_sel?80/255.f:.82f);
+        qo_native_text(65+i*2,value,fminf(l.font*.9f,rowPitch*.60f),l.left+l.listWidth*.72f,y+rowPitch*.27f,l.listWidth*.28f-l.padding,vpW,vpH,i==s_sel?48/255.f:.82f,i==s_sel?1:.84f,i==s_sel?80/255.f:.82f);
     }
     {
         const PcOptionHelp* help=Pc_OptionsHelp(rows[s_sel].key);
@@ -3093,7 +3106,6 @@ void Pc_QuickOptions_Draw(void)
         s_atlasReady = 0;
         qo_free_text();   /* every slot handle refers to the dead atlas */
         s_texWhite   = 0;
-        s_texCursor  = 0;
         qo_atlas_ensure();
         qo_build_white();
     }
@@ -3167,7 +3179,7 @@ void Pc_QuickOptions_Draw(void)
         if(title) {const PcTitlePainter painter={vpW,vpH,qo_title_image_tint,qo_native_rect,qo_native_text};int wasNative=s_native;s_native=1;Pc_TitleScreen_Draw(&painter);s_native=wasNative;}
         else if(ordinary) {int wasNative=s_native;s_native=1;qo_ordinary_draw(vpW,vpH);s_native=wasNative;}
         else qo_native_draw(vpW,vpH,rows,nRows);
-        goto draw_cursor;
+        goto restore;
     }
 
     /* Fade only; the phase itself advances in Update (game thread). */
@@ -3575,22 +3587,6 @@ void Pc_QuickOptions_Draw(void)
         }
         s_ddL = ddL; s_ddR = ddR; s_ddTop = ddTop; s_ddRowH = ddH;
         s_ddShown = 1;
-    }
-
-    /* Mouse cursor last, so it rides above the panel (the PSX-drawn one is
-     * composited under every overlay). Nearest keeps the sprite's pixel look. */
-draw_cursor:
-    if (!s_texCursor)
-    {
-        unsigned char rgba[32 * 32 * 4];
-        if (Pc_MouseCursor_SpriteRgba(rgba))
-            s_texCursor = qo_upload_rgba(rgba, 32, 32, 1);
-    }
-    if (s_texCursor)
-    {
-        float cx, cy, cw, ch;
-        if (Pc_MouseCursor_GlRect(vpW, vpH, &cx, &cy, &cw, &ch))
-            qo_quad(s_texCursor, NX(cx), NY(cy), NX(cx + cw), NY(cy - ch), 1.0f, 1.0f, 1.0f, 1.0f);
     }
 
 #undef NX

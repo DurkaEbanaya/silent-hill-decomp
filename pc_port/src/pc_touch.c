@@ -310,6 +310,10 @@ static int Tc_MenuAllowed(void)
     return !(g_SysWork.sysFlags & SysFlag_DemoActive);
 }
 
+/* Stamped with g_TickCount by a puzzle that reads taps itself rather than
+ * through the free-cursor servo (the map5_s01 combination lock). */
+int g_PcTapPuzzleFrame = -100;
+
 static int Tc_Mode(void)
 {
     int level = Tc_Level();
@@ -494,21 +498,13 @@ static int Tc_Mode(void)
         g_GameWork.gameState == GameState_LoadSavegameScreen)
         return TC_MODE_BACK_CURSOR;
 
-    /* Only while the browser is actually up, and only as the way OUT of it.
-     * Opening is the tappable "Achievements" line in the corner now
-     * (title.c), so a permanent button here would be a second control for
-     * something already on screen. Closing still needs one: the browser
-     * takes cancel or map to leave, and its own pointer handling uses a
-     * RIGHT click for that, which a finger cannot produce.
-     *
-     * Self-gating rather than platform-gated, so this file keeps carrying no
-     * platform conditionals: Pc_RaBrowser_IsOpen is false everywhere the
-     * browser is not compiled in or not open. */
+    /* The Achievements screen: the corner Back sends the cancel it leaves on,
+     * and taps elsewhere reach its list and its own BACK, as a free cursor. */
     {
-        extern int Pc_RaBrowser_IsOpen(void);
+        extern int Pc_AchScreen_IsOpen(void);
 
-        if (g_GameWork.gameState == GameState_MainMenu && Pc_RaBrowser_IsOpen())
-            return TC_MODE_TITLE;
+        if (g_GameWork.gameState == GameState_MainMenu && Pc_AchScreen_IsOpen())
+            return TC_MODE_BACK_CURSOR;
     }
 
     if (g_GameWork.gameState != GameState_InGame)
@@ -556,7 +552,10 @@ static int Tc_Mode(void)
          * opening one on a phone was a softlock. Give it the same lone Back
          * button the brightness screen gets. The drag still reaches the cursor;
          * only that one corner slot is taken. */
-        if (Pc_MouseCursor_PuzzleActive())
+        /* The combination lock too: under ADVANCE its corner was the scene
+         * Skip, which the lock does not read, so it could only be left by
+         * solving it. */
+        if (Pc_MouseCursor_PuzzleActive() || (g_TickCount - g_PcTapPuzzleFrame) <= 2)
             return TC_MODE_BACK_CURSOR;
 
         return TC_MODE_ADVANCE;

@@ -19,7 +19,8 @@ int main(void)
         "minimap_require_map", "low_health_glow", "crosshair", "crosshair_size", "text_size",
         "game_data", "allow_loose_files", "touch_controls", "touch_look_sensitivity",
         "one_button_combat", "touch_style", "touch_quicksave_buttons", "preferred_controller",
-        "achievements_account", "render_scale", "resident_textures", "return_to_title", "reset_settings" };
+        "achievements_account", "render_scale", "resident_textures", "return_to_title", "reset_settings",
+        "check_updates", "chara_per_pixel_light", "per_pixel_lighting", "hero_light" };
     const float sizes[][2] = { {640,480}, {1280,720}, {1920,1080}, {2560,1440},
         {3440,1440}, {5120,1440}, {1280,1024}, {600,900}, {3840,2160} };
     unsigned i;

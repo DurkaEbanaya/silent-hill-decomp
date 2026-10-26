@@ -297,13 +297,11 @@ static void title_draw_entries(const PcTitlePainter* painter)
     px=h*size;
     for(i=0;i<count;i++) {
         int active=ids[i]==selected,idx=difficulty?6+ids[i]:ids[i];
-        /* This branch's shared menu enum has Exit at ID 4 on every platform. */
-        if(!difficulty && ids[i]==4)idx=5;
+        /* Current upstream: Achievements=4, Exit=5; keep asset order aligned. */
         if(ru)idx+=9;
         float y=h*(top+i*pitch);
         float r=active?48/255.f:.83f,g=active?1:.83f,b=active?80/255.f:.83f;
         const char* text=difficulty?levels[ids[i]][ru]:names[ids[i]][ru];
-        if(!difficulty && ids[i]==4)text=names[5][ru];
         if(!s_assets.labels[idx]) {char file[96];snprintf(file,sizeof(file),"gamedata/menu-hd/label-%02d.png",idx);
             s_assets.labels[idx]=title_png(file,&s_assets.labelW[idx],&s_assets.labelH[idx]);}
         if(s_assets.labels[idx]) {
@@ -329,10 +327,6 @@ static void title_draw_entries(const PcTitlePainter* painter)
             painter->text(3+i,text,px,(w-lw)/2,y,w*.6f,w,h,r,g,b);
         }
     }
-#if defined(__ANDROID__) || defined(SH_IOS)
-    if(g_PcConfig.retroAchievements && !difficulty)
-        painter->text(27,ru?"Достижения":"Achievements",h*.038f,w*.04f,h*.91f,w*.28f,w,h,.75f,.9f,.77f);
-#endif
 }
 
 void Pc_TitleScreen_Draw(const PcTitlePainter* painter)

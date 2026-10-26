@@ -1,7 +1,26 @@
 apply plugin: 'com.android.application'
 
+// The commit this APK is built from, for the in-app update check (AppUpdate):
+// it offers the realtime build only when that build's commit is newer than
+// this one's. Empty and 0 outside a git checkout, which turns the check off.
+def gitOut = { List<String> args ->
+    try {
+        def p = (['git'] + args).execute(null, rootProject.projectDir)
+        def out = p.text.trim()
+        p.waitFor()
+        return p.exitValue() == 0 ? out : ''
+    } catch (Exception ignored) {
+        return ''
+    }
+}
+def gitSha  = gitOut(['rev-parse', 'HEAD'])
+def gitTime = gitOut(['log', '-1', '--format=%ct'])
+
 android {
     namespace 'com.silenthill.port'
+    buildFeatures {
+        buildConfig true
+    }
     compileSdk 34
     ndkVersion '27.3.13750724'
 
@@ -11,6 +30,8 @@ android {
         targetSdk 34
         versionCode 1
         versionName '0.1-android'
+        buildConfigField 'String', 'GIT_SHA', "\"${gitSha}\""
+        buildConfigField 'long', 'GIT_COMMIT_TIME', "${gitTime ?: '0'}L"
 
         externalNativeBuild {
             cmake {

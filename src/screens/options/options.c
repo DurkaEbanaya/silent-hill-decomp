@@ -51,6 +51,7 @@ extern int Ios_ShowRetroAchievementsLogin(void);
 #include "pc_quick_options.h"
 #ifdef SH_PC_PORT
 #include "lang_quick.h" /* quick-menu row values */
+#include "pc_pplit.h"
 #endif
 #include "lang_pack.h" /* PC-side pack language label (Polish) */
 #define LAYER_24   PSX_OT_OFS(24)
@@ -314,6 +315,10 @@ static const s_PcOpt PCOPT_G[] = {
      * of a gigabyte, and the location is fixed before the engine starts -- so it
      * asks SetupActivity to put the chooser back up on the next launch. */
     { "Game_Data",      NULL,                           NULL,                   NULL,      0, NULL,      NULL,                          0, PCK_STORAGE },
+    /* Whether the app looks for a newer realtime build when it opens. The
+     * check runs in SetupActivity before the engine, so a change takes hold on
+     * the next launch. */
+    { "Check_Updates",  &g_PcConfig.checkUpdates,       "check_updates",        VAL_ONOFF, 2, LBL_ONOFF, NULL,                          0, PCK_INT    },
 #endif
 #if defined(SH_IOS) || defined(__ANDROID__)
     /* The one switch behind every gamedata/load/ channel: replacement textures,
@@ -368,6 +373,10 @@ static const s_PcOpt PCOPT_S[] = {
      * Crosshair rows moved to the HUD page to make room, which is where the
      * quick-options overlay already groups them. */
     { "Weather_Rate",     &g_PcConfig.weatherSimHz,   "weather_sim_hz",   VAL_WHZ,   2, LBL_WHZ,   NULL, 1, PCK_INT  },
+    { "Character_Lighting", &g_PcConfig.charaPerPixelLight, "chara_per_pixel_light", VAL_ONOFF, 2, LBL_ONOFF, NULL, 1, PCK_INT },
+    { "Per_Pixel_Lighting", &g_PcConfig.perPixelLighting, "per_pixel_lighting", VAL_ONOFF, 2, LBL_ONOFF, NULL, 1, PCK_INT },
+    { "Hero_Light", &g_PcConfig.heroLight, "hero_light", (const int[]){0,1,2,3}, 4,
+      (const char* const[]){"Off","Low","Medium","High"}, NULL, 1, PCK_INT },
     { "Prev_Page",        NULL,                       NULL,               NULL,      0, NULL,      NULL, 0, PCK_PREV },
     { "Next_Page",        NULL,                       NULL,               NULL,      0, NULL,      NULL, 0, PCK_NEXT },
     { "Back",             NULL,                       NULL,               NULL,      0, NULL,      NULL, 0, PCK_BACK },
@@ -909,6 +918,9 @@ static void PcOpt_Adjust(const s_PcOpt* e, int dir)
             PsyX_ApplyVsync(g_PcConfig.vsync);
         } else if (e->kind == PCK_FLMODE) {
             Pc_FlashlightModeApply(*e->field, 1);
+        } else if (e->key && (!strcmp(e->key,"per_pixel_lighting") ||
+                              !strcmp(e->key,"hero_light"))) {
+            Pc_PpLit_Apply();
         } else if (e->live) {
             *e->live = *e->field;
         }
@@ -1028,7 +1040,7 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        /* Quick menu only: the PC Options graphics page is at its row limit. */
        QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE,
        QO_X_CAMSTYLE, QO_X_OTSSIDE, QO_X_CROSSHAIRSTYLE,
-       QO_X_LINEGAP };
+       QO_X_LINEGAP, QO_X_CHARALIGHT, QO_X_PPLIGHT, QO_X_HEROLIGHT };
 
 /* display_aspect = crt puts the picture on (4:3 x trim), so one framebuffer
  * pixel lands on screen this many times wider than tall at trim 1.0. It is the
@@ -1138,6 +1150,16 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
     }
     case QO_X_OTSSIDE:
         return Pc_LangQuickMenu((g_OtsSide > 0) ? "Right" : "Left");
+    case QO_X_CHARALIGHT:
+        return Pc_LangQuick(g_PcConfig.charaPerPixelLight ? "Per Pixel" : "Per Vertex");
+    case QO_X_PPLIGHT:
+        return Pc_LangQuickMenu(g_PcConfig.perPixelLighting ? "On" : "Off");
+    case QO_X_HEROLIGHT: {
+        static const char* const lbl[4] = { "Off", "Low", "Medium", "High" };
+        int i = g_PcConfig.heroLight;
+        if (i < 0 || i > 3) i = 0;
+        return (i == 0) ? Pc_LangQuickMenu("Off") : Pc_LangQuick(lbl[i]);
+    }
     case QO_X_LINEGAP: {
         int i = PcOpt_LineGapIndex();
         return (i == 0) ? Pc_LangQuickMenu("Off") : Pc_LangQuick(QO_LINEGAP_LBL[i]);
@@ -1610,6 +1632,29 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
         PcConfig_SaveKeyValue("dream_blur", g_PcConfig.dreamBlur ? "1" : "0");
         Sd_PlaySfx(Sfx_MenuMove, 0, 64);
         break;
+    /* Read by the skinned-character draw each frame, so it applies live. */
+    case QO_X_CHARALIGHT:
+        g_PcConfig.charaPerPixelLight = !g_PcConfig.charaPerPixelLight;
+        PcConfig_SaveKeyValue("chara_per_pixel_light", g_PcConfig.charaPerPixelLight ? "1" : "0");
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    case QO_X_PPLIGHT:
+        g_PcConfig.perPixelLighting = !g_PcConfig.perPixelLighting;
+        Pc_PpLit_Apply();
+        PcConfig_SaveKeyValue("per_pixel_lighting", g_PcConfig.perPixelLighting ? "1" : "0");
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    case QO_X_HEROLIGHT: {
+        char v[4];
+        int l = g_PcConfig.heroLight + dir;
+        if (l < 0 || l > 3) { SD_Call(Sfx_MenuError); break; }
+        g_PcConfig.heroLight = l;
+        Pc_PpLit_Apply();
+        snprintf(v, sizeof(v), "%d", l);
+        PcConfig_SaveKeyValue("hero_light", v);
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
+    }
     /* Read every frame by the gameplay gate in game_main.c, so it applies live. */
     /* The Change-Camera cycle, both ways. Persisted by Pc_ControlStyleSet. */
     case QO_X_CAMSTYLE: {
@@ -1720,6 +1765,7 @@ void Pc_Options_ResetToDefaults(void)
 #include <SDL.h>
 #include "pc_confirm_dialog.h"
 #include "pc_bind_panel.h"
+#include "pc_controls_screen.h"
 
 /* Shared with the header draw: 1 while the reset dialog is up (label turns red). */
 int g_PcOptResetConfirmActive = 0;
@@ -1889,7 +1935,7 @@ void Options_PcOptionsMenu_Control(void)
     Options_PcOptionsMenu_SelectionHighlightDraw();
     Options_Menu_VignetteDraw();
     Screen_BackgroundImgDraw(&g_ItemInspectionImg);
-    Pc_MouseCursor_Draw();
+    Pc_MouseCursor_Show();
 
     if (g_GameWork.gameStateSteps[0] != OptionsMenuState_PcOptions)
         return;
@@ -2324,6 +2370,8 @@ void GameState_Options_Update(void) // 0x801E2D44
         func_800363D0();
     }
 
+    /* Retail's options screen keeps the play timer running; the PC-only
+     * options page has no retail counterpart, so time spent there is not play. */
     if (g_GameWork.gameStatePrev != GameState_MainMenu
 #ifdef SH_PC_PORT
         && g_GameWork.gameStateSteps[0] != OptionsMenuState_PcOptions
@@ -2449,6 +2497,16 @@ void GameState_Options_Update(void) // 0x801E2D44
                 g_SysWork.counters_1C[1]              = 0;
                 g_GameWork.gameStateSteps[1] = 0;
                 g_GameWork.gameStateSteps[2] = 0;
+#ifdef SH_PC_PORT
+                /* Opened on entry, once per visit: a visit left by the
+                 * Select+Start warm reset never reaches the screen's own close,
+                 * so the screen cannot tell the next visit is a new one.
+                 * Phones use the bind panel instead (see
+                 * Options_ControllerMenu_Control). */
+#if !defined(__ANDROID__) && !defined(SH_IOS)
+                Pc_ControlsScreen_Open();
+#endif
+#endif
             }
             break;
 
@@ -2577,7 +2635,7 @@ void Options_ExtraOptionsMenu_Control(void) // 0x801E318C
     Options_Menu_VignetteDraw();
     Screen_BackgroundImgDraw(&g_ItemInspectionImg);
 #ifdef SH_PC_PORT
-    Pc_MouseCursor_Draw();
+    Pc_MouseCursor_Show();
 #endif
 
     if (g_GameWork.gameStateSteps[0] != OptionsMenuState_ExtraOptions)
@@ -2850,7 +2908,7 @@ void Options_MainOptionsMenu_Control(void) // 0x801E3770
 #ifdef SH_PC_PORT
     Options_MainOptionsMenu_FmvVolumeBarDraw();
     }
-    Pc_MouseCursor_Draw();
+    Pc_MouseCursor_Show();
 #endif
 
     if (g_GameWork.gameStateSteps[0] != OptionsMenuState_MainOptions)
@@ -4724,7 +4782,7 @@ void Options_BrightnessMenu_Control(void) // 0x801E6018
     Options_BrightnessMenu_ArrowsDraw();
     Options_BrightnessMenu_ConfigDraw();
 #ifdef SH_PC_PORT
-    Pc_MouseCursor_Draw();
+    Pc_MouseCursor_Show();
 #endif
 }
 
@@ -5108,9 +5166,12 @@ void Options_ControllerMenu_Control(void) // 0x801E69BC
     e_InputAction                           actionIdx;
     static s_ControllerMenu_SelectedEntries selectedEntries;
 
-#ifdef SH_PC_PORT
-    /* PC: this screen is the in-game controls panel (pc_bind_panel.c), a GL
-     * overlay over the PSX layout. It opens once per visit, and the screen
+#if defined(SH_PC_PORT) && (defined(__ANDROID__) || defined(SH_IOS))
+    /* Phones: this screen is the in-game controls panel (pc_bind_panel.c), a GL
+     * overlay over the PSX layout showing only the controller columns -- touch
+     * has its own layout and a phone has no keyboard. The desktop's native
+     * Controls screen (below) lays out keyboard and mouse columns a phone
+     * cannot use. It opens once per visit, and the screen
      * leaves the way EXIT does when the panel closes. The PSX actions pane
      * only ever re-mapped PSX buttons onto game actions, which on PC sits
      * under the launcher's physical binds and only confused them. */
@@ -5159,6 +5220,56 @@ void Options_ControllerMenu_Control(void) // 0x801E69BC
              * the old screen flashing up for a frame as the panel exits. The
              * Leave branch above handles every frame after this one and draws
              * nothing. */
+            return;
+        }
+    }
+#elif defined(SH_PC_PORT)
+    /* PC: this screen is the native Controls screen (pc_controls_screen.c),
+     * drawn in place of the PSX layout. It opens once per visit, and the screen
+     * leaves the way EXIT does when it closes. The PSX actions pane
+     * only ever re-mapped PSX buttons onto game actions, which on PC sits
+     * under the launcher's physical binds and only confused them. */
+    {
+        if (g_GameWork.gameStateSteps[1] == ControllerMenuState_Leave)
+        {
+            /* The PSX leave path would draw the old layout under the fade-out;
+             * leave the same way, fading out the native screen instead. */
+            Pc_ControlsScreen_Draw();
+            Pc_MouseCursor_Show();
+            if (ScreenFade_IsFinished())
+            {
+                Pc_ControlsScreen_Close();
+                ScreenFade_Start(true, true, false);
+                g_GameWork.gameStateSteps[0] = OptionsMenuState_LeaveController;
+                g_SysWork.counters_1C[1]     = 0;
+                g_GameWork.gameStateSteps[1] = 0;
+                g_GameWork.gameStateSteps[2] = 0;
+            }
+            return;
+        }
+        else
+        {
+            int open = Pc_ControlsScreen_Update();
+
+            Pc_ControlsScreen_Draw();
+            Pc_MouseCursor_Show();
+            if (open)
+            {
+                ScreenFade_Start(false, true, false);
+                g_Controller0->clickedBtnFlags   = 0;
+                g_Controller0->pulsedBtnFlags    = 0;
+                g_Controller0->pulsedGuiBtnFlags = 0;
+                return;
+            }
+            ScreenFade_Start(false, false, false);
+            g_GameWork.gameStateSteps[1] = ControllerMenuState_Leave;
+            g_GameWork.gameStateSteps[2] = 0;
+
+            /* Return on the closing frame too. Without this the function ran on
+             * into the stock controller layout below and drew it once, which is
+             * the old screen flashing up for a frame as the panel exits. The
+             * Leave branch above handles every frame after this one and draws
+             * only the native screen. */
             return;
         }
     }
@@ -5228,7 +5339,7 @@ void Options_ControllerMenu_Control(void) // 0x801E69BC
                 }
             }
         }
-        Pc_MouseCursor_Draw();
+        Pc_MouseCursor_Show();
     }
 #endif
 
