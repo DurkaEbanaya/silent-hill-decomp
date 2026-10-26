@@ -580,6 +580,9 @@ typedef struct {
      * itself is never slowed, the new area just waits. 0 = no minimum.
      * (config key: load_screen_min; console: loadmin) */
     float loadScreenMin;
+    /* Overlay/menu text only: 0=auto, 1=English, 2=Russian. Never rebinds
+     * the disc language, story text, font uploads or map resources. */
+    int uiLanguage;
 } s_PcConfig;
 
 extern s_PcConfig g_PcConfig;
@@ -655,4 +658,3 @@ const char* PcConfig_BindDefault(const char* key, int scheme);
 extern int g_PcBindsGen;
 
 #endif /* PC_CONFIG_H */
-

@@ -15,12 +15,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "font_ru.inc"
 
 typedef struct {
     unsigned char* raw;
     TIM_IMAGE tim;
 } MenuDiscFont;
 static MenuDiscFont s_discFont, s_latinFont;
+static MenuDiscFont s_uiRussianFont;
+static unsigned char s_uiRussianPixels[128*96];
+static RECT s_uiRussianRect={0,0,64,96};
 static int s_discRussian=-1;
 static const s_FontLayout* s_discLayout;
 
@@ -86,6 +90,13 @@ int Pc_MenuFontReady(void)
             fclose(f);
         }
     }
+    if(s_latinFont.tim.caddr && !s_uiRussianFont.tim.paddr) {
+        for(int cell=0;cell<126;cell++)for(int y=0;y<16;y++)for(int x=0;x<6;x++)
+            s_uiRussianPixels[((cell/21)*16+y)*128+(cell%21)*6+x]=FONT_RU_ATLAS[cell][y*6+x];
+        s_uiRussianFont.tim.paddr=(u_long*)s_uiRussianPixels;
+        s_uiRussianFont.tim.prect=&s_uiRussianRect;
+        s_uiRussianFont.tim.caddr=s_latinFont.tim.caddr;
+    }
     return s_discFont.tim.paddr && s_discFont.tim.caddr;
 }
 
@@ -101,6 +112,11 @@ static int font_glyph(unsigned cp, const MenuDiscFont** source, int* cell, int* 
     if (cp==' ' || cp=='_') { *advance=4; return 0; }
     if(cp==0x419 && Pc_RuActive() && Pc_RuDiscByte(cp)==Pc_RuDiscByte(0x439))cp=0x418;
     if (cp>=0x400 && cp<=0x4ff) b=Pc_RuActive()?Pc_RuDiscByte(cp):Pc_RuPackByte(cp);
+    if(cp>=0x400 && cp<=0x4ff && !Pc_RuActive() && s_uiRussianFont.tim.paddr) {
+        *source=&s_uiRussianFont;*cell=(int)b-0x27;
+        *advance=*cell>=0 && *cell<126?FONT_RU_WIDTHS[*cell]:5;
+        return *cell>=0 && *cell<126;
+    }
     if (cp==0x2014 || cp==0x2013) b='-';
     if (cp==0x00ab || cp==0x00bb || cp==0x201c || cp==0x201d) b='\'';
     if (cp<128 && s_latinFont.raw) {
@@ -142,8 +158,8 @@ unsigned char* Pc_MenuFontRaster(const char* text,float px,int* outW,int* outH)
     unsigned char* rgba;
     /* The native rasterizer implements EN/RU, not PAL accents or CJK. Preserve
      * the existing Unicode font path for every other active language. */
-    if (Pc_LangSjisActive() || (!Pc_RuActive() && !Font_RussianLayoutActive() &&
-        strcmp(g_PcConfig.languageCode,"en") && strcmp(g_PcConfig.languageCode,"en-us"))) return NULL;
+    if (!g_PcConfig.uiLanguage && (Pc_LangSjisActive() || (!Pc_RuActive() && !Font_RussianLayoutActive() &&
+        strcmp(g_PcConfig.languageCode,"en") && strcmp(g_PcConfig.languageCode,"en-us")))) return NULL;
     if (!text || px<=0 || !outW || !outH) return NULL;
     for(const char* p=text;*p;p++)if(*p=='\n')lines++;
     w=(int)ceilf(Pc_MenuFontWidth(text,px)+px+2);h=(int)ceilf(px+4+3*scale)+(lines-1)*(int)ceilf(px*1.05f);
@@ -212,6 +228,7 @@ unsigned char* Pc_MenuFontRaster(const char* text,float px,int* outW,int* outH)
 
 int Pc_MenuLanguageRussian(void)
 {
+    if(g_PcConfig.uiLanguage)return g_PcConfig.uiLanguage==2;
     const char* code = g_PcConfig.languageCode;
     return Pc_RuActive() || (Pc_LangPackActive() &&
         code[0] == 'r' && code[1] == 'u' &&
@@ -220,6 +237,7 @@ int Pc_MenuLanguageRussian(void)
 
 int Pc_MenuLanguageSupported(void)
 {
+    if(g_PcConfig.uiLanguage)return 1;
     return !Pc_LangSjisActive() && (Pc_MenuLanguageRussian() ||
         !strcmp(g_PcConfig.languageCode,"en") || !strcmp(g_PcConfig.languageCode,"en-us"));
 }

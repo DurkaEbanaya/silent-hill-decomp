@@ -544,7 +544,9 @@ const char* Pc_RuMenuUtf8(const char* us)
 {
     int i;
 
-    if (s_Active == NULL || us == NULL)
+    /* UTF-8 UI translation does not depend on the mounted disc charset.
+     * Encoded game-font text above remains strictly gated on s_Active. */
+    if (us == NULL)
         return NULL;
 
     for (i = 0; i < RU_MENU_COUNT; i++)

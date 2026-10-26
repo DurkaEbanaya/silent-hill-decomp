@@ -18,6 +18,8 @@
 #include "pc_confirm_dialog.h"
 #include "pc_bind_panel.h"
 #include "pc_quick_options.h"
+#include "pc_touch.h"
+#include <math.h>
 #include <libgs.h>
 
 /* Responsive GL menus request the pointer independently of PSX primitives. */
@@ -640,19 +642,17 @@ int Pc_MouseCursor_SpriteRgba(unsigned char* out)
 
 int Pc_MouseCursor_GlRect(float vpW, float vpH, float* outX, float* outY, float* outW, float* outH)
 {
-    float w, h, fbH;
+    float w, h;
 
     if (!Mc_Enabled() || !s_inView || Mc_HiddenForPad())
         return 0;
 
-    /* The PSX draw is 16x16 framebuffer units; the framebuffer is 320 wide and
-     * gsScreenHeight tall (448 on the interlaced menus, 224 in-game), so the
-     * cursor is the same fraction of the picture here as it is there. */
-    fbH = (float)g_GameWork.gsScreenHeight;
-    if (fbH <= 0.0f)
-        fbH = 240.0f;
-    w = 16.0f / 320.0f * vpW;
-    h = 16.0f / fbH * vpH;
+    if (Pc_MouseCursor_TouchDriving() || Pc_Touch_UsedRecently())
+        return 0;
+
+    /* Square physical pixels, independent of the menu framebuffer's aspect.
+     * Match the small pointer used before the mobile/desktop integration. */
+    w = h = fmaxf(16.0f, 32.0f * vpH / 960.0f);
 
     if (outX) *outX = s_vx * vpW;
     if (outY) *outY = (1.0f - s_vy) * vpH; /* top edge; arrow tip at top-left */

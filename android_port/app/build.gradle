@@ -25,7 +25,7 @@ android {
                 // there. Costs native build time; cheaper than finding out at
                 // the cabinet. `adb shell getprop ro.product.cpu.abilist` on the
                 // cabinet says which one it will actually use.
-                abiFilters 'arm64-v8a'
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
             }
         }
     }

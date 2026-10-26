@@ -41,6 +41,7 @@ enum { QL_ENGLISH = 0, QL_RUSSIAN, QL_PACK, QL_PAL, QL_JA, QL_ZH };
 /* The script the language is written in, whether or not a face can draw it. */
 static int QuickScriptWanted(void)
 {
+    if(g_PcConfig.uiLanguage)return LANG_QUICK_SCRIPT_LATIN;
     if (Pc_RuActive())
         return LANG_QUICK_SCRIPT_LATIN;
     if (Pc_LangPackActive())
@@ -212,6 +213,7 @@ static const char* CjkLookup(const s_QuickCjk* tbl, int count, const char* key, 
  * menu drawn behind it. */
 static int QuickLang(void)
 {
+    if(g_PcConfig.uiLanguage)return g_PcConfig.uiLanguage==2?QL_RUSSIAN:QL_ENGLISH;
     int lang = g_PcConfig.language;
 
     switch (QuickScriptWanted())

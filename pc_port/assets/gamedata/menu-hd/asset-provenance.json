@@ -42,12 +42,12 @@
     "label-15.png": "f44530dece4f8aaea13954cf894f4a1a8a919b2180e8ff899fcfa4ee3a0690cb",
     "label-16.png": "95f32d717e62273164b563e9c8439585516f0d1ddee099d8eba2c584bc12242c",
     "label-17.png": "db804f0dec0798154a7e3132babde43669ce3e0cc94b6c4bade05c7a97927dce",
-    "title-us.png": "3100618c576dc8faafda77f664f0c653b8327e3aca2b1bf7c869f53afb9e2d1f",
-    "title-us-wide.png": "b6abde6507a631ea284a8a916bbded61d02c44bb225eaefdb32837c2827119e5",
-    "title-pal.png": "4f61b5b72f5133407a693326e7f366d144f7efd59fd97741b001b6e26526d0bc",
     "side-left.png": "ed08fafac4e5e1e008b3a71d0d7242d9b29547ca8af96f53947f2ad66a45ece9",
     "side-right.png": "7ab571beebdb31404ed3d81563417d13addded8f66934a30f334d281a37d1e98",
-    "title-us-ultrawide.png": "ee88df551f54c80997fe7146f2fdad74baed48107be5c1b1eae1e3c61c11cfa3"
+    "title-pal.png": "4f61b5b72f5133407a693326e7f366d144f7efd59fd97741b001b6e26526d0bc",
+    "title-us-ultrawide.png": "ee88df551f54c80997fe7146f2fdad74baed48107be5c1b1eae1e3c61c11cfa3",
+    "title-us-wide.png": "b6abde6507a631ea284a8a916bbded61d02c44bb225eaefdb32837c2827119e5",
+    "title-us.png": "3100618c576dc8faafda77f664f0c653b8327e3aca2b1bf7c869f53afb9e2d1f"
   },
   "backgrounds": {
     "title-us.png": "User-supplied 1448x1086 reconstruction/upscale of the original US title alley. Copied without additional processing.",
@@ -64,5 +64,6 @@
     ],
     "source": "User-provided extended original-alley artwork; copied without edits. Displayed at viewport aspect >= 1.95 with aspect-preserving containment.",
     "sha256": "ee88df551f54c80997fe7146f2fdad74baed48107be5c1b1eae1e3c61c11cfa3"
-  }
+  },
+  "local_android_sync": "Current user-approved title compositions and menu lettering; source backgrounds copied without alterations. Existing underlying rights retained."
 }

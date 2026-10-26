@@ -20,5 +20,7 @@ void Pc_TitleScreen_Draw(const PcTitlePainter* painter);
 int Pc_TitleMenu_MouseRow(int count);
 /* Compositor availability, implemented by the overlay owner. */
 int Pc_TitleMenu_Active(void);
+/* Returns 1 when the title-only language button consumes this input. */
+int Pc_TitleScreen_LanguageUpdate(int controllerPressed);
 
 #endif

@@ -2064,6 +2064,28 @@ void Pc_QuickOptions_Update(int up, int down, int left, int right,
     }
 #endif
 
+#if !defined(QO_MOBILE)
+    /* Desktop native tabs use the same layout coordinates as their painter.
+     * Handle the press before list hit-testing so it cannot edit a setting. */
+    if (s_native && s_vpW>0 && s_vpH>0 &&
+        !Pc_ConfirmDialog_IsOpen() && Pc_MouseCursor_LeftClicked()) {
+        float x,y;
+        if (Pc_MouseCursor_ViewportPos(&x,&y)) {
+            PcOptionsLayout layout=Pc_OptionsLayout(s_vpW,s_vpH);
+            float py=y*s_vpH,px=x*s_vpW;
+            float tabTop=layout.top+layout.font*2.2f;
+            float tabWidth=layout.width/QO_NATIVE_PAGES;
+            int tab=(int)floorf((px-layout.left)/tabWidth);
+            if(py>=tabTop && py<tabTop+layout.font*1.7f &&
+               px>=layout.left && px<layout.left+layout.width &&
+               tab>=0 && tab<QO_NATIVE_PAGES) {
+                qo_set_page(tab);s_sel=0;s_viewRowsDirty=1;
+                qo_beep(Sfx_MenuMove);return;
+            }
+        }
+    }
+#endif
+
 #if defined(QO_MOBILE)
     /* The fog row's PGXP offer (see PcOpt_PgxpFogCheck). The dialog reads the
      * pointer itself; this menu sits still underneath until it is answered. */
@@ -2660,7 +2682,7 @@ static float qo_native_paragraph(const char* text, int slot, float px, float x, 
     /* Each line lives in the shared 2048px atlas. Ultrawide displays must wrap
      * before that limit, not ask the atlas for an impossible texture. */
     if (width > QO_ATLAS_W - 32) width = QO_ATLAS_W - 32;
-    while (*p && y + px < bottom && slot < 60) {
+    while (*p && y + px < bottom && slot < 46) {
         char line[512];
         const char *end = p, *space = NULL, *next;
         size_t n = 0;
@@ -2819,21 +2841,33 @@ static void qo_native_draw(float vpW, float vpH, const QoRowDef* rows, int count
     }
 #endif
     PcOptionsLayout l = Pc_OptionsLayout(vpW,vpH);
-    float header = l.font*2.8f, footer = l.font*3.2f;
+    float header = l.font*4.5f, footer = l.font*3.2f;
     float listT = l.top+header;
     float listH = l.height-header-footer;
     float rowPitch, helpX, helpY, helpW, bottom = l.top+l.height-footer;
     int i, ru=Pc_MenuLanguageRussian();
     if (l.stacked) listH *= .58f;
-    rowPitch = listH / 11;
+    rowPitch = listH / (count>0?count:1);
     helpX = l.stacked ? l.left : l.left+l.listWidth+l.gap;
     helpY = l.stacked ? listT+listH+l.gap : listT;
     helpW = l.stacked ? l.width : l.width-l.listWidth-l.gap;
 
     qo_native_rect(0,0,vpW,vpH,vpW,vpH,0,0,0,1);
     qo_native_text(0,qo_local("PC OPTIONS", "НАСТРОЙКИ ПК"),l.font*1.2f,l.left+l.padding,l.top+l.font*.6f,l.width*.30f,vpW,vpH,.78f,.82f,.78f);
-    qo_native_text(1,s_nativeNames[s_page][ru],l.font,l.left+l.width*.35f,l.top+l.font*.75f,l.width*.40f,vpW,vpH,.85f,.88f,.9f);
     qo_native_text(2,s_previewOnly?qo_local("Esc: Back","Esc: Назад"):qo_local("R: Reset", "R: Сброс"),l.font*.8f,l.left+l.width*.84f,l.top+l.font*.8f,l.width*.15f,vpW,vpH,.75f,.78f,.8f);
+    {
+        static const char* const tabs[5][2]={{"Graphics","Графика"},{"Lighting","Освещение"},
+            {"Controls","Управление"},{"Camera","Камера"},{"HUD","Интерфейс"}};
+        float tabWidth=l.width/QO_NATIVE_PAGES,tabTop=l.top+l.font*2.2f;
+        for(i=0;i<QO_NATIVE_PAGES;i++) {
+            float x=l.left+i*tabWidth;int active=i==s_page;
+            qo_native_rect(x,tabTop,tabWidth-l.padding*.35f,l.font*1.7f,vpW,vpH,
+                active?.06f:.025f,active?.16f:.055f,.04f,1);
+            float px=l.font*.85f,tw=qo_text_width(tabs[i][ru],px);
+            qo_native_text(46+i,tabs[i][ru],px,x+(tabWidth-tw)*.5f,tabTop+l.font*.34f,
+                tabWidth-l.padding*.5f,vpW,vpH,active?48/255.f:.75f,active?1:.82f,active?80/255.f:.75f);
+        }
+    }
 
     s_vpW=vpW; s_vpH=vpH;
     s_geoPanelL=l.left; s_geoPanelR=l.left+l.listWidth;
@@ -2860,23 +2894,30 @@ static void qo_native_draw(float vpW, float vpH, const QoRowDef* rows, int count
         const char* description=help ? help->description[ru] : qo_local(
             "Choose a category with Q/E, PgUp/PgDn or the shoulder buttons. Back returns to the original options menu.",
             "Выберите раздел клавишами Q/E, PgUp/PgDn или верхними кнопками геймпада. «Назад» возвращает в исходное меню настроек.");
-        float textY;
-        float previewH;
         qo_native_text(30,heading,l.font*1.1f,helpX,helpY,helpW,vpW,vpH,.4f,.85f,.48f);
-        textY=qo_native_paragraph(description,31,l.font*.9f,helpX,helpY+l.font*2,helpW,bottom-l.font*.7f,vpW,vpH);
-        previewH=fminf(helpW*9/16,fmaxf(0,bottom-textY-l.font*.7f));
-        if(previewH>0) {
-            const char* key=rows[s_sel].key;
-            PcBakedPreview baked;
-            float pw=previewH*16/9,px=helpX+helpW-pw,py=bottom-previewH;
-            if(Pc_BakedPreview_Get(key,qo_baked_value(key),&baked)) {
-                float imageH=fminf(previewH*.8f,pw*baked.height/baked.width);
-                float imageW=imageH*baked.width/baked.height;
-                qo_title_image_tint(baked.texture,px+pw-imageW,py,imageW,imageH,vpW,vpH,1,1,1,1);
-                char caption[160];snprintf(caption,sizeof(caption),qo_local("Example %.2g; other parameters fixed","Пример %.2g; остальные параметры фиксированы"),baked.value);
-                qo_native_text(61,caption,l.font*.65f,px,py+previewH*.87f,pw,vpW,vpH,.5f,.7f,.55f);
-            } else qo_native_text(61,qo_baked_status(key),
-                l.font*.8f,px,py+previewH*.4f,pw,vpW,vpH,.7f,.73f,.7f);
+        const char* key=rows[s_sel].key;
+        PcBakedPreview baked;
+        float contentY=helpY+l.font*2;
+        if(Pc_BakedPreview_Get(key,qo_baked_value(key),&baked)) {
+            /* Give the example its own guaranteed area, never the few pixels
+             * left over after wrapping an arbitrarily long description. */
+            float imageH=fminf(helpW*baked.height/baked.width,
+                fmaxf(0,(bottom-contentY)*.70f));
+            float imageW=imageH*baked.width/baked.height;
+            qo_title_image_tint(baked.texture,helpX+(helpW-imageW)*.5f,contentY,
+                imageW,imageH,vpW,vpH,1,1,1,1);
+            char caption[192];snprintf(caption,sizeof(caption),qo_local(
+                "Example %.3g; other settings fixed%s","Пример %.3g; остальные параметры фиксированы%s"),
+                baked.value,baked.approximate?qo_local(" (nearest)"," (ближайший)"):"");
+            float captionY=contentY+imageH+l.font*.4f;
+            qo_native_text(61,caption,l.font*.65f,helpX,captionY,helpW,vpW,vpH,.5f,.7f,.55f);
+            qo_native_paragraph(description,31,l.font*.72f,helpX,captionY+l.font*1.3f,
+                helpW,bottom-l.font*.3f,vpW,vpH);
+        } else {
+            qo_native_paragraph(description,31,l.font*.9f,helpX,contentY,helpW,
+                bottom-l.font*2,vpW,vpH);
+            qo_native_text(61,qo_baked_status(key),l.font*.7f,helpX,bottom-l.font,
+                helpW,vpW,vpH,.7f,.73f,.7f);
         }
     }
     qo_native_text(27,qo_local("Up/Down: select    Left/Right: adjust    Q/E or LB/RB: category", "Вверх/вниз: выбор    Влево/вправо: значение    Q/E или LB/RB: раздел"),l.font*.75f,l.left,bottom+l.font*.7f,l.width,vpW,vpH,.72f,.75f,.78f);
@@ -3126,7 +3167,7 @@ void Pc_QuickOptions_Draw(void)
         if(title) {const PcTitlePainter painter={vpW,vpH,qo_title_image_tint,qo_native_rect,qo_native_text};int wasNative=s_native;s_native=1;Pc_TitleScreen_Draw(&painter);s_native=wasNative;}
         else if(ordinary) {int wasNative=s_native;s_native=1;qo_ordinary_draw(vpW,vpH);s_native=wasNative;}
         else qo_native_draw(vpW,vpH,rows,nRows);
-        goto restore;
+        goto draw_cursor;
     }
 
     /* Fade only; the phase itself advances in Update (game thread). */
@@ -3538,6 +3579,7 @@ void Pc_QuickOptions_Draw(void)
 
     /* Mouse cursor last, so it rides above the panel (the PSX-drawn one is
      * composited under every overlay). Nearest keeps the sprite's pixel look. */
+draw_cursor:
     if (!s_texCursor)
     {
         unsigned char rgba[32 * 32 * 4];

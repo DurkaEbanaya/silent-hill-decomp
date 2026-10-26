@@ -8,6 +8,8 @@
 #include <string.h>
 #include "pc_baked_preview.h"
 #define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
 #define STBI_NO_STDIO
 #include "stb_image.h"
 
@@ -93,7 +95,11 @@ int main(int argc,char** argv)
     assert(!Pc_BakedPreview_Get(NULL,0,&image));
     assert(glGetError()==GL_NO_ERROR);
     Pc_BakedPreview_Close();
-    assert(Pc_BakedPreview_Get("use_pgxp",1,&image) && image.animated);
+    assert(Pc_BakedPreview_Get("use_pgxp",0,&image) && !image.animated && image.value==0);
+    GLuint pgxpTexture=image.texture;
+    SDL_Delay(40);
+    assert(Pc_BakedPreview_Get("use_pgxp",0,&image) && !image.animated && image.texture==pgxpTexture);
+    assert(Pc_BakedPreview_Get("use_pgxp",1,&image) && !image.animated && image.value==1);
     puts("Closing preview cache");
     Pc_BakedPreview_Close();
     puts("Deleting test GL objects");
@@ -101,6 +107,6 @@ int main(int argc,char** argv)
     puts("Deleting GL context");SDL_GL_DeleteContext(context);
     puts("Destroying SDL window");SDL_DestroyWindow(window);
     puts("Quitting SDL");SDL_Quit();
-    puts("PASS: 303 FOV values, both weather loops, nearest/missing, GL state, close/reopen");
+    puts("PASS: 303 FOV values, both weather loops, static PGXP pair, nearest/missing, GL state, close/reopen");
     return 0;
 }

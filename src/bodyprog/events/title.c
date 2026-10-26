@@ -346,6 +346,15 @@ void GameState_MainMenu_Update(void) // 0x8003AB28
             }
 #endif
 
+#ifdef SH_PC_PORT
+            if (!browserOpen && Pc_TitleScreen_LanguageUpdate(
+                (g_Controller0->clickedBtnFlags & ControllerFlag_LStickRight)!=0)) {
+                SD_Call(Sfx_MenuMove);
+                g_Controller0->clickedBtnFlags=0;
+                g_Controller0->pulsedBtnFlags=0;
+            }
+#endif
+
             if (g_Controller0->pulsedBtnFlags & ControllerFlag_LStickUp)
             {
                 g_MainMenu_SelectedEntry += MainMenuEntry_Count;

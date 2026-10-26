@@ -8,7 +8,7 @@ on:
         default: false
         description: Run only the Windows diagnostic
   push:
-    branches: [test/ui-crossplatform-validation]
+    branches: [test/ui-crossplatform-validation, pr/crossplatform-baked-menus]
 
 permissions:
   contents: read
@@ -82,26 +82,7 @@ jobs:
             ctest --test-dir build-ui -R '^pc_' --output-on-failure
           fi
       - name: Validate packaged examples
-        shell: python
-        run: |
-          from pathlib import Path
-          import hashlib, json, struct
-          root=Path('build-ui/gamedata/previews')
-          manifest=root/'manifest.tsv'
-          rows=[line.split() for line in manifest.read_text().splitlines() if line and not line.startswith('#')]
-          assert len(rows)<=1024
-          hashes=json.loads((root/'provenance.json').read_text())['files']
-          for key,value,frames,fps,pattern in rows:
-              frames=int(frames); fps=int(fps)
-              assert 1<=frames<=60 and 1<=fps<=60
-              for i in range(frames):
-                  name=pattern%i if frames>1 else pattern
-                  data=(root/name).read_bytes()
-                  assert data[:8]==b'\x89PNG\r\n\x1a\n'
-                  w,h=struct.unpack('>II',data[16:24])
-                  assert w*h*4*frames<=32*1024*1024
-                  assert hashlib.sha256(data).hexdigest()==hashes[name]
-          print('Validated',len(rows),'packaged example variants; no disc required')
+        run: python pc_port/tests/validate_preview_assets.py build-ui/gamedata/previews
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -130,8 +111,64 @@ jobs:
           test -f "$APP/gamedata/menu-hd/title-us-ultrawide.png"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$APP/Info.plist")" = iPhoneOS
           file "$APP/SilentHill"
+          python3 pc_port/tests/validate_preview_assets.py "$APP/gamedata/previews"
       - uses: actions/upload-artifact@v4
         with:
           name: UI-validation-iOS-unsigned
           path: build-ios/SilentHill-unsigned.ipa
+          if-no-files-found: error
+
+  android:
+    if: ${{ !inputs.windows_only }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+          validate-wrappers: false
+      - name: Android SDK components
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+          echo "sdk.dir=$SDK" > android_port/local.properties
+      - name: Build both ARM ABIs
+        env:
+          JAVA_HOME_ANDROID: ${{ env.JAVA_HOME }}
+          GRADLE_BIN: gradle
+          CMAKE_BUILD_PARALLEL_LEVEL: '3'
+        run: bash android_port/build_android.sh
+      - name: Validate APK resources and ABIs
+        run: |
+          python3 - <<'PY'
+          import zipfile, tempfile, sys
+          from pathlib import Path
+          sys.path.insert(0, 'pc_port/tests')
+          from validate_preview_assets import validate
+          with zipfile.ZipFile('android_port/app/build/outputs/apk/debug/app-debug.apk') as apk:
+              for abi in ['arm64-v8a','armeabi-v7a']:
+                  for so in ['libmain.so','libSDL2.so']:
+                      assert f'lib/{abi}/{so}' in apk.namelist()
+              prefix=next(n[:-len('manifest.tsv')] for n in apk.namelist() if n.endswith('gamedata/previews/manifest.tsv'))
+              with tempfile.TemporaryDirectory() as folder:
+                  root=Path(folder)
+                  for name in apk.namelist():
+                      if name.startswith(prefix) and not name.endswith('/'):
+                          relative=Path(name[len(prefix):]); assert '..' not in relative.parts
+                          target=root/relative; target.parent.mkdir(parents=True,exist_ok=True)
+                          target.write_bytes(apk.read(name))
+                  validate(root)
+          print('PASS: both ARM ABIs and identical packaged examples')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UI-validation-Android-debug
+          path: android_port/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

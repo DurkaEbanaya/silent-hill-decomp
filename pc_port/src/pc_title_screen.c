@@ -16,6 +16,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <SDL.h>
+
+int Pc_TitleScreen_LanguageUpdate(int controllerPressed)
+{
+    static int previousL;
+    static int touchStarted;
+    static float touchX,touchY;
+    int down=SDL_GetKeyboardState(NULL)[SDL_SCANCODE_L];
+    int pressed=down && !previousL;
+    float x,y;
+    previousL=down;
+    if(!Pc_TitleScreen_Available()){touchStarted=0;return 0;}
+    { int ids[6],selected,difficulty;
+      extern int Pc_TitleMenu_Rows(int*,int*,int*);
+      Pc_TitleMenu_Rows(ids,&selected,&difficulty);
+      if(difficulty){touchStarted=0;return 0;} }
+    int tapped=0;
+    if(Pc_MouseCursor_TouchPressed() && Pc_MouseCursor_TouchViewportPos(&x,&y)) {
+        touchX=x;touchY=y;
+        touchStarted=x>=.74f && x<=.98f && y>=.035f && y<=.12f;
+    }
+    if(touchStarted && Pc_MouseCursor_TouchViewportPos(&x,&y)) {
+        if(fabsf(x-touchX)>.035f || fabsf(y-touchY)>.035f)touchStarted=0;
+        if(Pc_MouseCursor_TouchReleased(NULL,NULL)) {
+            tapped=touchStarted && x>=.74f && x<=.98f && y>=.035f && y<=.12f;
+            touchStarted=0;
+        }
+    }
+    if(tapped || (!Pc_MouseCursor_TouchDriving() && Pc_MouseCursor_LeftClicked() && Pc_MouseCursor_ViewportPos(&x,&y) &&
+        x>=.74f && x<=.98f && y>=.035f && y<=.12f) || pressed || controllerPressed) {
+        g_PcConfig.uiLanguage=Pc_MenuLanguageRussian()?1:2;
+        PcConfig_SaveKeyValue("ui_language",g_PcConfig.uiLanguage==2?"ru":"en");
+        return 1;
+    }
+    return 0;
+}
 
 int Pc_TitleScreen_Available(void)
 {
@@ -306,6 +342,21 @@ void Pc_TitleScreen_Draw(const PcTitlePainter* painter)
     title_draw_background(painter);
     title_draw_fog(painter);
     title_draw_entries(painter);
+    { int ids[6],selected,difficulty;
+      extern int Pc_TitleMenu_Rows(int*,int*,int*);
+      Pc_TitleMenu_Rows(ids,&selected,&difficulty);
+      if(!difficulty) {
+        painter->rect(w*.74f,h*.035f,w*.24f,h*.085f,w,h,.015f,.035f,.02f,.95f);
+        painter->text(28,Pc_MenuLanguageRussian()?"Язык: Русский":"Language: English",
+#if defined(__ANDROID__) || defined(SH_IOS)
+            h*.048f,w*.755f,h*.05f,w*.215f,w,h,.7f,1,.75f);
+#else
+            h*.034f,w*.755f,h*.05f,w*.215f,w,h,.7f,1,.75f);
+        painter->text(29,Pc_MenuLanguageRussian()?"L / вправо: сменить":"L / Right: switch",
+            h*.020f,w*.755f,h*.095f,w*.215f,w,h,.6f,.75f,.62f);
+#endif
+      }
+    }
     /* The GL compositor is after the PSX fade, so reproduce its intensity. */
     float fade=1-Screen_FadeInProgressGet()/4096.f;
     if(fade>0)painter->rect(0,0,w,h,w,h,0,0,0,fminf(fade,1));
