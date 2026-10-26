@@ -313,6 +313,10 @@ static const s_PcOpt PCOPT_G[] = {
      * of a gigabyte, and the location is fixed before the engine starts -- so it
      * asks SetupActivity to put the chooser back up on the next launch. */
     { "Game_Data",      NULL,                           NULL,                   NULL,      0, NULL,      NULL,                          0, PCK_STORAGE },
+    /* Whether the app looks for a newer realtime build when it opens. The
+     * check runs in SetupActivity before the engine, so a change takes hold on
+     * the next launch. */
+    { "Check_Updates",  &g_PcConfig.checkUpdates,       "check_updates",        VAL_ONOFF, 2, LBL_ONOFF, NULL,                          0, PCK_INT    },
 #endif
 #if defined(SH_IOS) || defined(__ANDROID__)
     /* The one switch behind every gamedata/load/ channel: replacement textures,

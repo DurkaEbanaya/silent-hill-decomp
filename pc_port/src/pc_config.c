@@ -145,6 +145,7 @@ s_PcConfig g_PcConfig = {
 #endif
     .touchStyle          = TouchStyle_Context,
     .touchQuickSaveLoad  = 0,
+    .checkUpdates        = 1,
     .touchLookSensitivity = 1.0f,
     .renderScale         = 1.0f,
     .lowEndMode          = 0,
@@ -1210,6 +1211,10 @@ void PcConfig_Load(const char* path)
                 v = TouchStyle_Context;
 
             g_PcConfig.touchStyle = v;
+        }
+        else if (strcmp(key, "check_updates") == 0)
+        {
+            g_PcConfig.checkUpdates = (atoi(value) != 0);
         }
         else if (strcmp(key, "touch_quicksave_buttons") == 0)
         {

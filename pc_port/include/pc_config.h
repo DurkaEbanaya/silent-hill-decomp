@@ -327,6 +327,10 @@ typedef struct {
      * styles. Off by default: they open the save and load screens, which
      * nobody wants under a stray thumb. Config key: touch_quicksave_buttons. */
     int   touchQuickSaveLoad;
+    /* Android: look for a newer realtime build on launch and offer it. Read by
+     * the Java side straight from config.cfg (AppUpdate), before the engine
+     * starts; its "Don't ask again" writes 0. Config key: check_updates. */
+    int   checkUpdates;
     float touchLookSensitivity; /* touch look speed multiplier, 0.1..4.0 (config key: touch_look_sensitivity); default 1.0 */
     int   oneButtonCombat;  /* 1 = Aim also fires, so combat is one thumb (config key: one_button_combat) */
     int altButtonSprint;    /* "Always use button based sprinting": 1 = walk by default, sprint ONLY while the bound run control is held — applies to alt cameras (TPS/OTS/FPS) AND 2D control under any camera; 0 = a near-full stick push also sprints (config key: altcam_button_sprint) */
