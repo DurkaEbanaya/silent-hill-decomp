@@ -1123,6 +1123,12 @@ if(BUILD_TESTING)
         target_include_directories(pc_baked_preview_gl_test PRIVATE
             include "${PSYCROSS_DIR}/include" ${SDL2_INCLUDE_DIRS})
         target_link_libraries(pc_baked_preview_gl_test PRIVATE SDL2::SDL2)
+        # The disc-free test must also work when only its target is built; the
+        # normal game's POST_BUILD asset copy has not necessarily run then.
+        add_custom_command(TARGET pc_baked_preview_gl_test POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/gamedata/previews"
+                "$<TARGET_FILE_DIR:pc_baked_preview_gl_test>/gamedata/previews")
         if(UNIX)
             target_link_libraries(pc_baked_preview_gl_test PRIVATE ${CMAKE_DL_LIBS} m)
         endif()
