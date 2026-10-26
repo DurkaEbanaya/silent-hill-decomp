@@ -75,8 +75,8 @@ second game process or alter the player's world to make an example. The earlier
 Linux worker and diagnostic FBO/mesh/TIM modules remain as development references;
 the normal menu does not call their live-preview entry points.
 
-`gamedata/previews/manifest.tsv` contains 493 variants for 18 settings, referencing
-611 JPEGs. This includes all integer FOV values 40–140 for FPS/TPS/OTS and separate
+`gamedata/previews/manifest.tsv` contains 501 variants for 21 settings, referencing
+619 JPEGs. This includes all integer FOV values 40–140 for FPS/TPS/OTS and separate
 30/60 Hz precipitation loops. The images were captured offline from the real game
 in independent temporary runtimes with an owned disc; other parameters are fixed.
 Flashlight-shadow examples include an actual NPC caster because Harry and his
@@ -118,7 +118,8 @@ lookup, unpack-state restoration and close/reopen without needing a game disc.
 These boundaries reduce cross-feature dependencies; they do not make a large
 rendering/UI change automatically safe or guarantee zero coupling warnings.
 
-This depends on [PsyCross PR #22](https://github.com/SlickAmogus/PsyCross/pull/22): full-viewport presentation and
+This includes the responsive-renderer work related to [PsyCross PR #22](https://github.com/SlickAmogus/PsyCross/pull/22),
+merged with upstream renderer revision `d7ae5d4`: full-viewport presentation and
 pointer coordinates for responsive overlays, neutral UI post-processing, hidden
 worker windows and an optional pre-swap capture callback. The parent repository's
 submodule pointer must include that commit. A standalone PsyCross build does not
@@ -136,7 +137,7 @@ from 640x480 through ultrawide/portrait/4K. This unit test does not prove render
 input, worker lifecycle or translations on every disc. Runtime verification and
 known limits are recorded in the PR rather than claimed by this test.
 
-For disc-free validation of the actual PNG player, add `-DSH_UI_GL_TEST=ON`,
+For disc-free validation of the actual PNG/JPEG player, add `-DSH_UI_GL_TEST=ON`,
 build `pc_baked_preview_gl_test`, then run it from its build directory (under
 Xvfb when Linux has no display). That target stages its own example fixtures;
 building the game first is not required. The test creates a real SDL/GL context,
@@ -150,8 +151,8 @@ Software-driver CI is not vendor-driver certification. In particular, a passing
 upload sequence followed by a hang in `SDL_DestroyWindow` is still a failed
 lifecycle test, not a pass or a reason to skip teardown.
 
-Keep the independent aim-transition, OuterProduct12, sewer-water and mall-TV PGXP
-fixes in their existing PRs (#176–#179). They are not bundled here. The local
+The aim-transition, OuterProduct12, sewer-water and mall-TV PGXP fixes (#176–#179)
+are inherited from current upstream, not reapplied as duplicate patches. The local
 Bluetooth cache repair is a machine-specific operation, not part of the game PR.
 
 ### Manual regression checklist
