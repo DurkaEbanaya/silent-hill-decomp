@@ -132,6 +132,20 @@ from 640x480 through ultrawide/portrait/4K. This unit test does not prove render
 input, worker lifecycle or translations on every disc. Runtime verification and
 known limits are recorded in the PR rather than claimed by this test.
 
+For disc-free validation of the actual PNG player, add `-DSH_UI_GL_TEST=ON`,
+build `pc_baked_preview_gl_test`, then run it from its build directory (under
+Xvfb when Linux has no display). That target stages its own example fixtures;
+building the game first is not required. The test creates a real SDL/GL context,
+checks all 303 FOV samples, both weather animations, nearest/missing lookup,
+pixel-unpack state preservation and close/reopen, then destroys the cache,
+context and window normally. CTest bounds it to 120 seconds. Failed checks
+print to stderr and exit nonzero rather than opening a CRT assertion dialog.
+`SH_PREVIEW_TRACE=1` optionally logs decoded frames for diagnosis.
+
+Software-driver CI is not vendor-driver certification. In particular, a passing
+upload sequence followed by a hang in `SDL_DestroyWindow` is still a failed
+lifecycle test, not a pass or a reason to skip teardown.
+
 Keep the independent aim-transition, OuterProduct12, sewer-water and mall-TV PGXP
 fixes in their existing PRs (#176–#179). They are not bundled here. The local
 Bluetooth cache repair is a machine-specific operation, not part of the game PR.
