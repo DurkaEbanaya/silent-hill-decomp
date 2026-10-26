@@ -47,7 +47,8 @@
     "title-pal.png": "4f61b5b72f5133407a693326e7f366d144f7efd59fd97741b001b6e26526d0bc",
     "title-us-ultrawide.png": "ee88df551f54c80997fe7146f2fdad74baed48107be5c1b1eae1e3c61c11cfa3",
     "title-us-wide.png": "b6abde6507a631ea284a8a916bbded61d02c44bb225eaefdb32837c2827119e5",
-    "title-us.png": "3100618c576dc8faafda77f664f0c653b8327e3aca2b1bf7c869f53afb9e2d1f"
+    "title-us.png": "3100618c576dc8faafda77f664f0c653b8327e3aca2b1bf7c869f53afb9e2d1f",
+    "inventory-portrait.png": "3f06438b34136c291109c9f0de41f8808f0d48b48db1fdbbcc69cc91188a9861"
   },
   "backgrounds": {
     "title-us.png": "User-supplied 1448x1086 reconstruction/upscale of the original US title alley. Copied without additional processing.",
@@ -65,5 +66,15 @@
     "source": "User-provided extended original-alley artwork; copied without edits. Displayed at viewport aspect >= 1.95 with aspect-preserving containment.",
     "sha256": "ee88df551f54c80997fe7146f2fdad74baed48107be5c1b1eae1e3c61c11cfa3"
   },
-  "local_android_sync": "Current user-approved title compositions and menu lettering; source backgrounds copied without alterations. Existing underlying rights retained."
+  "local_android_sync": "Current user-approved title compositions and menu lettering; source backgrounds copied without alterations. Existing underlying rights retained.",
+  "inventory_portrait": {
+    "source": "User-provided transparent portrait",
+    "source_sha256": "7b9090df08dc92bb247ffee9a41c59a5a45a1b897f2afd1b8589771fc473e62f",
+    "source_dimensions": [
+      1278,
+      1231
+    ],
+    "method": "Aspect-preserving Lanczos reduction into original HEROPIC2 portrait UV area; compensate original non-square stored pixels. Transparent PNG, no new sharpening or generative processing. Original health scan remains game-rendered.",
+    "rights": "User-provided portrait adaptation for this UI contribution; original character/artwork rights remain with their respective owners. No new license to the underlying artwork is asserted."
+  }
 }
