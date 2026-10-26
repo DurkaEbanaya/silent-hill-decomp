@@ -7,7 +7,7 @@
   Project Website: https://sh1pc.com/ <br/>
   Discord: https://discord.gg/JWuNzVsQbr
 
-## Licensing at a glance
+  Play on the web: https://sh1pc.com/play/
 
 **The port is GPL-3.0.** That covers `pc_port/`, `android_port/` and every `SH_PC_PORT` addition to the decompiled sources.
 
@@ -109,10 +109,20 @@ Mods are **on by default** on Android, because there is no launcher to turn them
 
 The mod *tools* (disc extraction, TIM ↔ PNG, character texture reference sheets, ILM ↔ OBJ model export) are in the PC launcher's Mod Manager. Build mods on a PC, then copy the resulting `gamedata/` files to the phone. Full file formats and workflows: [`Modding_And_Extraction_Guide.md`](pc_port/docs/Modding_And_Extraction_Guide.md), [`Model_Modding_Guide.md`](pc_port/docs/Model_Modding_Guide.md), [`Modern_Item_GLTF_Modding_Guide.md`](pc_port/docs/Modern_Item_GLTF_Modding_Guide.md).
 
+## Licensing at a glance
+
+**The PC port is GPL-3.0.** That covers `pc_port/` (engine, launcher, tooling, docs) and every `SH_PC_PORT` addition to the decompiled sources. Files carrying an `SPDX-License-Identifier: GPL-3.0-or-later` header are the ones being licensed here.
+
+**The decompilation is not licensed by this project.** `src/`, `include/`, `configs/`, `asm/`, `lib/` and `rom/` are a decompilation of Konami's Silent Hill, and remain the work of the [silent-hill-decomp](https://github.com/shdecompilations/silent-hill-decomp) contributors. This project asserts no copyright over that material and grants no rights to it. The GitHub license badge above refers to the port only.
+
+**No game data is included.** Silent Hill is © Konami. A legally obtained copy of the PlayStation disc is required to play; nothing from it ships here or in any release.
+
+Full breakdown, including bundled third-party components: [COPYRIGHT.md](COPYRIGHT.md).
+
 ## Support
 
 I'm on Discord as **@KushAstronaut**, and the project has a Discord server: https://discord.gg/JWuNzVsQbr
 
-<br/>
+This is a 100% free project funded from my own pocket. If you'd like to support me, it is greatly appreciated, and you can do so on Ko-fi:<br/> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/F1F3K8V3B)
 
 Silent Hill is © Konami and this does not contain any game assets. You must provide a legally obtained dump of Silent Hill for PSX to use.
