@@ -100,6 +100,15 @@ int main(int argc,char** argv)
     SDL_Delay(40);
     assert(Pc_BakedPreview_Get("use_pgxp",0,&image) && !image.animated && image.texture==pgxpTexture);
     assert(Pc_BakedPreview_Get("use_pgxp",1,&image) && !image.animated && image.value==1);
+    {
+        const char* keys[]={"chara_per_pixel_light","per_pixel_lighting","hero_light"};
+        int k,level;
+        for(k=0;k<3;k++)for(level=0;level<(k==2?4:2);level++) {
+            assert(Pc_BakedPreview_Get(keys[k],(float)level,&image));
+            assert(!image.animated && !image.approximate && image.value==(float)level);
+            assert(image.width==640 && image.height==360 && glIsTexture(image.texture));
+        }
+    }
     puts("Closing preview cache");
     Pc_BakedPreview_Close();
     puts("Deleting test GL objects");

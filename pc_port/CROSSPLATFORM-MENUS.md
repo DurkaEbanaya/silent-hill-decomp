@@ -1,11 +1,12 @@
-# Unified menu follow-up
+# Integrated cross-platform menus
 
-This branch is the Android-port-based, cross-platform continuation of PR #180.
-It is not a blind rebase of the older `pc-port` isolated-worker prototype.
-The implementation is based on the Android branch revision used for the device
-tests (`e915338e5`). Later upstream Android changes require manual integration;
-successful CI on this revision does not mean it is conflict-free against today's
-branch tip. Keep the follow-up in draft until that integration is reviewed.
+This branch replaces the older #180 / #185 implementations. Android upstream
+`d5cc03b47` has been merged and the menu/config/input/renderer conflicts resolved.
+It retains the upstream native achievements and controls screens. It also includes
+upstream pc-port commits `6eeeaa1f8` and `e54c5c222` (replacement-model weapon
+placement and launcher QoL metadata), already present in the locally tested game.
+PsyCross is pinned to a merge with upstream `d7ae5d4`; no older input or lighting
+implementation is intentionally restored. Physical-device coverage remains limited.
 
 ## Shared implementation and resources
 
@@ -18,7 +19,7 @@ branch tip. Keep the follow-up in draft until that integration is reviewed.
 - Desktop menus have five clickable tabs; touch layouts retain six categories,
   larger targets, inertial scrolling and explicit Back buttons. These are
   deliberate platform layouts, not divergent copies of the source.
-- 493 parameter variants reference 611 JPEG images, including 303 integer FOV
+- 501 parameter variants reference 619 JPEG images, including 303 integer FOV
   samples and two 60-frame precipitation loops. The PGXP example is now a
   genuinely rendered static off/on door pair, not a scarcely visible animation.
 - Example JPEGs use quality 80, 4:2:0, encoded once from the captured PNGs.
@@ -28,7 +29,14 @@ branch tip. Keep the follow-up in draft until that integration is reviewed.
 - The normal menu uses bounded decoded-frame caching and no secondary game
   process. Historical renderer prototypes remain development references only.
 
-Only 18 settings have verified examples. Unsupported visual effects show their
+The three additional lighting settings include eight real-render captures: a
+separate glTF test character, the supported fog-enabled world-lighting path,
+and four stock-Harry fill-light levels. The test GLB is not installed or bundled;
+CesiumMan attribution and adaptations are recorded in `lighting-credits.txt`.
+The world example explicitly enables the engine fog path in both captures and
+does not claim to demonstrate every room or draw path.
+
+Only 21 settings have verified examples. Unsupported visual effects show their
 description rather than an unrelated image; see `BAKED-PREVIEWS-AUDIT.md`.
 The showcase holds other parameters fixed and uses a nearest-value caption when
 appropriate. Precipitation loops reset at their one-second boundary.
@@ -53,5 +61,5 @@ existing locally signed installation. Do not uninstall an existing app merely
 to install a CI artifact: that can discard app data. Release signing belongs to
 the maintainer; no keys or game discs are included here.
 
-The unrelated 2D aim, OuterProduct12, sewer-water timing and mall-TV fixes remain
-in their separate PRs. They are deliberately not bundled into this UI follow-up.
+The 2D aim, OuterProduct12, sewer-water timing and mall-TV fixes are now inherited
+from current upstream; their earlier PRs were merged, not reapplied as duplicates.

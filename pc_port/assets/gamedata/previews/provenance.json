@@ -622,7 +622,15 @@
     "crosshair-01.jpg": "e7f2db2224d299548df781a809e6283b81a3344f3a77682cdf14e90ab8947c12",
     "crosshair-00.jpg": "eb8b3bb52af68f22431926d677e3f6c47185b9fb67c981b7e297230624e1f781",
     "pgxp-door-off.jpg": "a102c0ed40f456c8f8cbe2143b3b13b9ccc23ccd11fbeb774cf7ca9e37c83a93",
-    "pgxp-door-on.jpg": "0f9239c134807e115fc8fbaaaafc4b6641ba84571758ec8c603499843e6cf138"
+    "pgxp-door-on.jpg": "0f9239c134807e115fc8fbaaaafc4b6641ba84571758ec8c603499843e6cf138",
+    "chara_per_pixel_light-lighting-0.jpg": "61216ca0a86a92372b40b8d55ad3a0e0ef1a71a867218b3f8fa9160cfaabf036",
+    "chara_per_pixel_light-lighting-1.jpg": "43dde399d71f0d3dbbe27377cdc236d3dd9e4ee2f734398b933770bbb462092d",
+    "per_pixel_lighting-lighting-0.jpg": "178a9d9458472a7d9b3fc7ca3b1a8201082b590bb1659f64c8748b240ae903da",
+    "per_pixel_lighting-lighting-1.jpg": "075e28ef4598fb39f136ddc2d7ee46b34032f8dde06726ce2add7c235f3dd7d5",
+    "hero_light-lighting-0.jpg": "075e28ef4598fb39f136ddc2d7ee46b34032f8dde06726ce2add7c235f3dd7d5",
+    "hero_light-lighting-1.jpg": "1f0a2080b2494b301c7d05ace2a224bdf1bcaef2437d3c03a218108480a1cf7d",
+    "hero_light-lighting-2.jpg": "8862f1083656b2b2827b593e050a7e9793068681000641d2c080f747864712e3",
+    "hero_light-lighting-3.jpg": "e39519052c9c90a4cc82ba7423909945e9450037142c8b7921829cd87c1792b7"
   },
   "weather": "Two 60-frame, 60 fps clips captured from identical initial particle-module state and RNG. Particle callbacks use deterministic Q12 render deltas totalling 4096 ticks per 60 frames, independently of debugger wall clock; native weather_sim_hz controls 30 Hz stepping versus per-render updates. Original rendered 640x360 frames reduced to 480x270 for a bounded 32 MiB decoded cache. Loop wrap resets to the recorded start; not a seamless physical simulation.",
   "hud": "Actual in-engine minimap/crosshair and low-health warning; private disposable game state only. Crosshair drawn by original Pc_CrosshairDraw in isolated FPS scene.",
@@ -662,5 +670,13 @@
       640,
       360
     ]
+  },
+  "lighting_examples": {
+    "source_executable_sha256": "f5f7f19d461cb66665b6f5a27696268ccac94b681d514964f8c5ee77c2a8f541",
+    "capture": "Real OpenGL framebuffer, 1280x720 downsampled to 640x360; JPEG quality80 4:2:0; no painted lighting. Scene/camera fixed per setting.",
+    "world": "map1_s00, stock Harry, engine isFogEnabled forced on for both captures to exercise supported world point-light primitive path; camera eye (141.2,-1.2,17), look (140,-0.9,19). Only per_pixel_lighting changes. This path does not represent all rooms.",
+    "fill": "Same school view, stock Harry; per-pixel lighting on, hero_light 0/1/2/3; changed pixels restricted to character silhouette.",
+    "replacement": "CesiumMan test glTF adapted to loader skeleton/Y-up and embedded texture converted losslessly to PNG, only in disposable baker; hero_light fixed Low, world per-pixel on. Not installed as a character mod. No normal map in this sample.",
+    "model_credit": "CesiumMan ©2017 Cesium, CC BY 4.0; Cesium logo ©2015 Cesium. https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CesiumMan ; https://creativecommons.org/licenses/by/4.0/ . Adaptations: bone naming/identity clavicle anchors and coordinate transform. Original game imagery retains original rights."
   }
 }

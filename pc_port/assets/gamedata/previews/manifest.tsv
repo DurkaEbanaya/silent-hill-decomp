@@ -493,3 +493,11 @@ flashlight_mode 0 1 1 flashlight_mode-00.jpg
 flashlight_mode 1 1 1 flashlight_mode-01.jpg
 flashlight_mode 2 1 1 flashlight_mode-02.jpg
 flashlight_mode 3 1 1 flashlight_mode-03.jpg
+chara_per_pixel_light	0	1	1	chara_per_pixel_light-lighting-0.jpg
+chara_per_pixel_light	1	1	1	chara_per_pixel_light-lighting-1.jpg
+per_pixel_lighting	0	1	1	per_pixel_lighting-lighting-0.jpg
+per_pixel_lighting	1	1	1	per_pixel_lighting-lighting-1.jpg
+hero_light	0	1	1	hero_light-lighting-0.jpg
+hero_light	1	1	1	hero_light-lighting-1.jpg
+hero_light	2	1	1	hero_light-lighting-2.jpg
+hero_light	3	1	1	hero_light-lighting-3.jpg
