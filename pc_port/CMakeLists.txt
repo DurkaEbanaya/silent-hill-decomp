@@ -1128,6 +1128,7 @@ if(BUILD_TESTING)
         endif()
         add_test(NAME pc_baked_preview_gl_test COMMAND pc_baked_preview_gl_test)
         set_tests_properties(pc_baked_preview_gl_test PROPERTIES
+            TIMEOUT 120
             WORKING_DIRECTORY "$<TARGET_FILE_DIR:SilentHillPC>")
     endif()
 endif()
