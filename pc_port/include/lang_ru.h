@@ -27,6 +27,8 @@ void Pc_RuInit(void);
 
 /* 1 once a Russian patch has been detected and its menu table encoded. */
 int Pc_RuActive(void);
+/* Decode mounted-disc glyph bytes for a separate native-resolution UI. */
+void Pc_RuDiscTextUtf8(const char* text,char* out,unsigned capacity);
 
 /* Russian for one compiled US menu literal, or NULL to keep the original. */
 const char* Pc_RuMenuText(const char* us);

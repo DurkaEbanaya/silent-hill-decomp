@@ -31,6 +31,7 @@
 #include "pc_quick_options.h"
 #include "pc_menu_font.h"
 #include "pc_title_screen.h"
+#include "pc_inventory_layout.h"
 #include "pc_bind_panel.h"
 #include "pc_confirm_dialog.h"
 #include "pc_mouse_cursor.h"
@@ -2537,7 +2538,7 @@ int Pc_OrdinaryOptions_Active(void)
 
 int Pc_OptionsOverlay_Active(void)
 {
-    return s_native || Pc_OrdinaryOptions_Active() || Pc_TitleMenu_Active();
+    return s_native || Pc_OrdinaryOptions_Active() || Pc_TitleMenu_Active() || Pc_InventoryAdapted();
 }
 
 int Pc_TitleMenu_Active(void) {return s_glReady==1 && Pc_TitleScreen_Available();}
@@ -3064,7 +3065,11 @@ void Pc_QuickOptions_Draw(void)
 #endif
     }
     previewWasOpen=s_native;
-    if (s_phase == QO_CLOSED && !ordinary && !title)
+    {static int inventoryWasOpen;
+     int inventoryOpen=Pc_InventoryAdapted();
+     if(inventoryWasOpen && !inventoryOpen)Pc_InventoryClose();
+     inventoryWasOpen=inventoryOpen;}
+    if (s_phase == QO_CLOSED && !ordinary && !title && !Pc_InventoryAdapted())
         return;
     rows = qo_page_rows(s_page, &nRows);
     /* The keybind panel stands in for this menu while it is open. */
@@ -3162,7 +3167,7 @@ void Pc_QuickOptions_Draw(void)
         s_cachedH = (int)vpH;
     }
 
-    if (s_native || ordinary || title) {
+    if (s_native || ordinary || title || Pc_InventoryAdapted()) {
         qo_build_white();
         glUseProgram(s_prog);
         glBindVertexArray(s_vao);
@@ -3176,7 +3181,8 @@ void Pc_QuickOptions_Draw(void)
         glBlendEquation(GL_FUNC_ADD);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
-        if(title) {const PcTitlePainter painter={vpW,vpH,qo_title_image_tint,qo_native_rect,qo_native_text};int wasNative=s_native;s_native=1;Pc_TitleScreen_Draw(&painter);s_native=wasNative;}
+        if(Pc_InventoryAdapted()) {const PcTitlePainter painter={vpW,vpH,qo_title_image_tint,qo_native_rect,qo_native_text};int wasNative=s_native;s_native=1;Pc_InventoryDraw(&painter);s_native=wasNative;}
+        else if(title) {const PcTitlePainter painter={vpW,vpH,qo_title_image_tint,qo_native_rect,qo_native_text};int wasNative=s_native;s_native=1;Pc_TitleScreen_Draw(&painter);s_native=wasNative;}
         else if(ordinary) {int wasNative=s_native;s_native=1;qo_ordinary_draw(vpW,vpH);s_native=wasNative;}
         else qo_native_draw(vpW,vpH,rows,nRows);
         goto restore;

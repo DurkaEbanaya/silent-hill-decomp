@@ -8,7 +8,7 @@ on:
         default: false
         description: Run only the Windows diagnostic
   push:
-    branches: [test/ui-crossplatform-validation, pr/crossplatform-baked-menus, pr/integrated-crossplatform-menus]
+    branches: [test/ui-crossplatform-validation, pr/crossplatform-baked-menus, pr/integrated-crossplatform-menus, pr/adapted-inventory]
 
 permissions:
   contents: read
@@ -53,7 +53,7 @@ jobs:
         shell: msys2 {0}
         run: |
           cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON
-          cmake --build build-ui --target SilentHillPC pc_gte_math_test pc_native_menu_test pc_ach_model_test pc_bind_core_test pc_input_glyphs_test pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
+          cmake --build build-ui --target SilentHillPC pc_inventory_layout_test pc_gte_math_test pc_native_menu_test pc_ach_model_test pc_bind_core_test pc_input_glyphs_test pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
           # Hosted Windows runners have no guaranteed modern hardware ICD.
           # Exercise real GL calls through Mesa softpipe, not a skipped/mock test.
           # llvmpipe passed all preview checks but hung in SDL_DestroyWindow on
@@ -75,7 +75,7 @@ jobs:
             args+=(-DCMAKE_C_COMPILER="$gcc" -DOPENAL_LIBRARY="$(brew --prefix openal-soft)/lib/libopenal.dylib" -DOPENAL_INCLUDE_DIR="$(brew --prefix openal-soft)/include" -DJPEG_LIBRARY="$(brew --prefix jpeg-turbo)/lib/libjpeg.dylib" -DJPEG_INCLUDE_DIR="$(brew --prefix jpeg-turbo)/include")
           fi
           cmake -S pc_port -B build-ui -G Ninja -DSH_BUILD_MAP_DLLS=ON -DBUILD_TESTING=ON -DSH_FMV_FFMPEG=OFF -DSH_UI_GL_TEST=ON "${args[@]}"
-          cmake --build build-ui --target SilentHillPC pc_gte_math_test pc_native_menu_test pc_ach_model_test pc_bind_core_test pc_input_glyphs_test pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
+          cmake --build build-ui --target SilentHillPC pc_inventory_layout_test pc_gte_math_test pc_native_menu_test pc_ach_model_test pc_bind_core_test pc_input_glyphs_test pc_options_help_test pc_big_tmd_test pc_preview_mesh_test pc_preview_tim_test pc_baked_preview_gl_test -j 3
           if [ "$RUNNER_OS" = Linux ]; then
             LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a ctest --test-dir build-ui -R '^pc_' --output-on-failure
           else
