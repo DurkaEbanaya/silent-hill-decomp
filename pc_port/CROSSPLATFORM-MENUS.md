@@ -2,6 +2,10 @@
 
 This branch is the Android-port-based, cross-platform continuation of PR #180.
 It is not a blind rebase of the older `pc-port` isolated-worker prototype.
+The implementation is based on the Android branch revision used for the device
+tests (`e915338e5`). Later upstream Android changes require manual integration;
+successful CI on this revision does not mean it is conflict-free against today's
+branch tip. Keep the follow-up in draft until that integration is reviewed.
 
 ## Shared implementation and resources
 

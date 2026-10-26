@@ -5,7 +5,8 @@ not the earlier Linux live-worker design in PR #180. Existing PRs are unchanged.
 
 This change replaces the English/Russian PC-options, ordinary-options and title
 presentation without replacing the existing option adjustment/config-save APIs.
-Other languages retain the legacy menu paths. This is not a rewrite of inventory,
+Auto mode keeps other languages on the legacy paths; an explicit EN/RU menu
+override is independent of the disc's story language. This is not a rewrite of inventory,
 map, save/load or all other original screens.
 
 ## Interface
@@ -75,7 +76,7 @@ Linux worker and diagnostic FBO/mesh/TIM modules remain as development reference
 the normal menu does not call their live-preview entry points.
 
 `gamedata/previews/manifest.tsv` contains 493 variants for 18 settings, referencing
-641 PNGs. This includes all integer FOV values 40–140 for FPS/TPS/OTS and separate
+611 JPEGs. This includes all integer FOV values 40–140 for FPS/TPS/OTS and separate
 30/60 Hz precipitation loops. The images were captured offline from the real game
 in independent temporary runtimes with an owned disc; other parameters are fixed.
 Flashlight-shadow examples include an actual NPC caster because Harry and his
@@ -88,9 +89,12 @@ effects retain descriptions and an honest unavailable-example message. See
 JSON for file hashes and capture limitations. Weather loops reset after one second;
 display refresh/render rate can limit the visible cadence.
 
-The player validates manifest paths, entry/frame counts, PNG dimensions, file size
+PGXP uses a static off/on door comparison with the same camera. Examples are
+compressed once with JPEG quality 80 and 4:2:0; title/font PNGs are unchanged.
+
+The player validates manifest paths, entry/frame counts, image dimensions, file size
 and a 32 MiB decoded-frame budget. Frames are decoded only when the variant changes;
-animation changes the texture on its playback tick without repeated PNG decoding.
+animation changes the texture on its playback tick without repeated image decoding.
 Closing the menu releases the current decoded frames and GL texture. A real SDL/GL
 test exercises texture upload, all 303 FOV values, both weather loops, nearest/missing
 lookup, unpack-state restoration and close/reopen without needing a game disc.
