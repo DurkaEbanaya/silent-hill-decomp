@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <PsyX/common/glad.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "pc_baked_preview.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -15,6 +16,12 @@
 #endif
 /* assert must be active in RelWithDebInfo too. */
 #include <assert.h>
+/* MinGW's CRT assertion dialog can block an unattended runner indefinitely.
+ * Report failed checks to the captured log and exit, without a GUI prompt. */
+#undef assert
+#define assert(test) do { if(!(test)) { \
+    fprintf(stderr,"CHECK failed: %s (%s:%d)\n",#test,__FILE__,__LINE__); \
+    exit(EXIT_FAILURE); } } while(0)
 
 int main(int argc,char** argv)
 {
