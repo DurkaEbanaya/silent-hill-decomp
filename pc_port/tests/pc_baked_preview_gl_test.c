@@ -94,9 +94,13 @@ int main(int argc,char** argv)
     assert(glGetError()==GL_NO_ERROR);
     Pc_BakedPreview_Close();
     assert(Pc_BakedPreview_Get("use_pgxp",1,&image) && image.animated);
+    puts("Closing preview cache");
     Pc_BakedPreview_Close();
+    puts("Deleting test GL objects");
     glDeleteTextures(1,&oldTexture);glDeleteBuffers(1,&pbo);
-    SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();
+    puts("Deleting GL context");SDL_GL_DeleteContext(context);
+    puts("Destroying SDL window");SDL_DestroyWindow(window);
+    puts("Quitting SDL");SDL_Quit();
     puts("PASS: 303 FOV values, both weather loops, nearest/missing, GL state, close/reopen");
     return 0;
 }
