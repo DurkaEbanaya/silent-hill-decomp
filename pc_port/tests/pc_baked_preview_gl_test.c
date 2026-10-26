@@ -71,10 +71,15 @@ int main(int argc,char** argv)
     glGetIntegerv(GL_UNPACK_SKIP_PIXELS,&value);assert(value==3);
     puts("Testing weather loops");
     for(i=30;i<=60;i+=30) {
+        printf("Weather %d: loading\n",i);
         assert(Pc_BakedPreview_Get("weather_sim_hz",(float)i,&image));
+        printf("Weather %d: loaded\n",i);
         assert(image.animated && image.width==480 && image.height==270 && !image.approximate);
+        puts("Waiting for animation tick");
         SDL_Delay(40);
+        puts("Uploading next animation frame");
         assert(Pc_BakedPreview_Get("weather_sim_hz",(float)i,&image));
+        printf("Weather %d: advanced\n",i);
     }
     assert(Pc_BakedPreview_Get("fps_fov",71.1f,&image) && image.approximate && image.value==71);
     assert(!Pc_BakedPreview_Get("not_a_setting",0,&image));

@@ -93,6 +93,7 @@ int Pc_BakedPreview_Get(const char* key,float value,PcBakedPreview* result)
     if(current!=best) {
         clear_frames();current=best;frame=-1;started=SDL_GetTicks();
         for(i=0;i<e->frames;i++) {
+            if(getenv("SH_PREVIEW_TRACE"))fprintf(stderr,"Preview %s frame %d/%d\n",key,i+1,e->frames);
             int w,h;cached[i]=load_frame(e,i,&w,&h);
             if(!cached[i] || (i && (w!=imageW||h!=imageH))) {
                 clear_frames();failed[best]=1;current=-1;return 0;
