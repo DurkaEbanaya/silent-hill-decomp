@@ -2,6 +2,11 @@ name: UI cross-platform validation
 
 on:
   workflow_dispatch:
+    inputs:
+      windows_only:
+        type: boolean
+        default: false
+        description: Run only the Windows diagnostic
   push:
     branches: [test/ui-crossplatform-validation]
 
@@ -13,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-14]
+        os: ${{ fromJSON(inputs.windows_only && '["windows-2022"]' || '["ubuntu-22.04","windows-2022","macos-14"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -52,13 +57,11 @@ jobs:
           # Hosted Windows runners have no guaranteed modern hardware ICD.
           # Exercise real GL calls through Mesa llvmpipe, not a skipped/mock test.
           cp /mingw64/bin/opengl32.dll /mingw64/bin/libgallium_wgl.dll build-ui/
-          export SDL_OPENGL_LIBRARY="$PWD/build-ui/opengl32.dll"
+          export SDL_OPENGL_LIBRARY="$(cygpath -w "$PWD/build-ui/opengl32.dll")"
           export GALLIUM_DRIVER=llvmpipe
           export LIBGL_ALWAYS_SOFTWARE=1
-          if ! ctest --test-dir build-ui -R '^pc_' --output-on-failure; then
-            (cd build-ui && gdb -q -batch -ex run -ex bt --args ./pc_baked_preview_gl_test.exe)
-            exit 1
-          fi
+          export LP_NUM_THREADS=2
+          ctest --test-dir build-ui -R '^pc_' --verbose --timeout 120
       - name: Build and test Unix desktop
         if: runner.os != 'Windows'
         shell: bash
@@ -106,6 +109,7 @@ jobs:
           if-no-files-found: ignore
 
   ios:
+    if: ${{ !inputs.windows_only }}
     runs-on: macos-15
     timeout-minutes: 40
     steps:
