@@ -1647,6 +1647,30 @@ void DebugCamera_Update(void)
         prevPeriod = curPeriod;
     }
 
+    /* - / + while the inspector is on: cycle the play-as character. The swap
+     * sticks after the viewer is turned off, so this is the quick way to pick
+     * who to play as. */
+    {
+        extern int Pc_ConsoleIsOpen(void);
+        static int prevMinus = 0, prevPlus = 0;
+        int curMinus = g_sdlKeyboardState[SDL_SCANCODE_MINUS] || g_sdlKeyboardState[SDL_SCANCODE_KP_MINUS];
+        int curPlus  = g_sdlKeyboardState[SDL_SCANCODE_EQUALS] || g_sdlKeyboardState[SDL_SCANCODE_KP_PLUS];
+        if (g_DebugAnimKfView && !Pc_ConsoleIsOpen()) {
+            int step = 0;
+            if (curMinus && !prevMinus) step = -1;
+            if (curPlus && !prevPlus)   step = 1;
+            if (step != 0) {
+                extern int         Pc_PlayAs_Cycle(int step);
+                extern const char* Pc_PlayAs_Label(int idx);
+                int idx = Pc_PlayAs_Cycle(step);
+                Sd_PlaySfx(Sfx_MenuConfirm, 0, 64);
+                SH_DBG_ECHO("[PLAYAS] %s", Pc_PlayAs_Label(idx));
+            }
+        }
+        prevMinus = curMinus;
+        prevPlus  = curPlus;
+    }
+
 
     /* `/` while the inspector is on: cycle the equipped weapon's UPPER-BODY anims
      * (HARRY_BASE_ANIM_INFOS entries 56..75 = anim indices 28..37: aim / fire /
