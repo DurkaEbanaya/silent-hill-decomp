@@ -21,6 +21,7 @@
 #include "gpu.h"
 #include "sh_log.h"
 #include "psx_memory.h"
+#include "miniz.h"          /* mz_crc32: distinguish Japanese retail revisions */
 #include "pc_config.h"
 #include "hires_override.h" /* HiresOverride_ClampBudgetToVram */
 #include "pc_audio_config.h"
@@ -313,6 +314,12 @@ unsigned int PcPort_FileTableStartSector(int fileIdx)
  * offsets are chosen here from whichever disc is present. */
 static char g_GameDiscPath[1024] = { 0 };
 static int  g_DiscResolved       = 0;
+static u32  s_JpnOverlayLinkBase = 0x800CBBD0u;
+
+u32 PcPort_GetJpnOverlayLinkBase(void)
+{
+    return s_JpnOverlayLinkBase;
+}
 
 /* Read the boot executable name (SLUS/SLES/SLPM prefix) from a BIN's ISO9660
  * root directory to identify the region. Returns a Region_* value or -1. */
@@ -321,7 +328,6 @@ static int Pc_DetectRegionFromBin(const char* path)
     FILE*         f = fopen(path, "rb");
     unsigned char sec[2048];
     unsigned int  rlba;
-    unsigned int  exeLba = 0;
     unsigned      o;
     int           region = -1;
 
@@ -351,24 +357,9 @@ static int Pc_DetectRegionFromBin(const char* path)
                      memcmp(&sec[o + 33], "SIPS", 4) == 0)
             {
                 region = Region_JPN;
-                exeLba = sec[o + 2] | (sec[o + 3] << 8) | (sec[o + 4] << 16) | ((unsigned)sec[o + 5] << 24);
             }
         }
         o += L;
-    }
-
-    /* NTSC-J: the region tables in this build are for the Rev 1/Rev 2 exe
-     * (SLPM-86192 99-06-02, PS-X EXE t_size 0x13800). The first print shifts
-     * the containers and file table slightly — flag it rather than misload. */
-    if (region == Region_JPN && exeLba != 0)
-    {
-        unsigned int tSize = 0;
-        fseek(f, (long)exeLba * 2352 + 24, SEEK_SET);
-        if (fread(sec, 1, 2048, f) == 2048 && memcmp(sec, "PS-X EXE", 8) == 0)
-            tSize = sec[0x1C] | (sec[0x1D] << 8) | (sec[0x1E] << 16) | ((unsigned)sec[0x1F] << 24);
-        if (tSize != 0x13800)
-            SH_WARN("NTSC-J disc looks like the FIRST PRINT (exe t_size %#x, expected 0x13800 for Rev 1/2) — "
-                    "using Rev 1/2 tables; some files may misload", tSize);
     }
 
     fclose(f);
@@ -502,6 +493,25 @@ static void Pc_RemapFileTableFromDisc(const char* discPath)
 static void Pc_ApplyDiscRegion(const char* discPath, e_GameRegion region)
 {
     Fs_InitFileTableForRegion(region);
+    s_JpnOverlayLinkBase = 0x800CBBD0u;
+    if (region == Region_JPN && discPath && discPath[0])
+    {
+        unsigned char* exe = NULL;
+        unsigned       size = 0;
+
+        /* Both revisions use SLPM-86192 AND t_size 0x13800. Use the same
+         * first-4096-byte fingerprint as silentassets, not that header size.
+         * The existing disc-table remap below supplies Rev 0's sectors. */
+        if (Pc_ReadDiscExe(discPath, &exe, &size))
+        {
+            if (size >= 4096 && mz_crc32(0, exe, 4096) == 0x1532C55Cu)
+            {
+                s_JpnOverlayLinkBase = 0x800CBAA8u;
+                SH_LOG("NTSC-J Rev 0 (1999-01-26): using original overlay link base");
+            }
+            free(exe);
+        }
+    }
     if (discPath && discPath[0])
         Pc_RemapFileTableFromDisc(discPath);
     /* Also to the log file: the "Disc:" SH_LOG line only reaches stdout/the
