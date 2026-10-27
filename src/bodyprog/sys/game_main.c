@@ -3923,7 +3923,27 @@ void MainLoop(void) // 0x80032EE0
             }
         }
 #endif
+#ifdef SH_PC_PORT
+        {
+            /* Hospital kitchens, director's office furniture, the Otherworld
+             * plate door and bloodsucker room window may overlap in the PSX
+             * ordering table. Test opaque world depth only in these rooms;
+             * restore the diagnostic setting before any other OT draw. */
+            extern int g_PsxWorldDepthAlways;
+            int prevWorldDepthAlways = g_PsxWorldDepthAlways;
+            if (g_GameWork.gameState == GameState_InGame && g_SavegamePtr != NULL &&
+                ((g_SavegamePtr->mapIdx == MapIdx_MAP3_S01 &&
+                  (g_SavegamePtr->mapRoomIdx == 10 || g_SavegamePtr->mapRoomIdx == 11)) ||
+                 (g_SavegamePtr->mapIdx == MapIdx_MAP3_S04 && g_SavegamePtr->mapRoomIdx == 10) ||
+                 (g_SavegamePtr->mapIdx == MapIdx_MAP3_S03 &&
+                  (g_SavegamePtr->mapRoomIdx == 29 || g_SavegamePtr->mapRoomIdx == 35))))
+                g_PsxWorldDepthAlways = 0;
+            GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
+            g_PsxWorldDepthAlways = prevWorldDepthAlways;
+        }
+#else
         GsDrawOt(&g_OrderingTable0[g_ActiveBufferIdx]);
+#endif
 #ifdef SH_PC_PORT
         {
             extern int g_PcPickupItemActive;
