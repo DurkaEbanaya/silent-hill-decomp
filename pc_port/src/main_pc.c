@@ -687,6 +687,7 @@ static void PrintBanner(void)
 }
 
 static int s_SkipToGameArg = 0;
+static const char* s_RendererArg = NULL;
 
 static void ParseArgs(int argc, char* argv[])
 {
@@ -704,11 +705,17 @@ static void ParseArgs(int argc, char* argv[])
              * ever SET it, so the option silently did nothing. */
             s_SkipToGameArg = 1;
         }
+        else if (strcmp(argv[i], "-renderer") == 0 && i + 1 < argc)
+        {
+            s_RendererArg = argv[i + 1];
+            i++;
+        }
         else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
             printf("Usage: SilentHillPC [options]\n");
             printf("Options:\n");
             printf("  -data <path>    Path to game data directory or CD image\n");
+            printf("  -renderer <name> Override the config's renderer (gl, d3d11, vulkan, ...)\n");
             printf("  -h, --help      Show this help\n");
             exit(0);
         }
@@ -729,7 +736,9 @@ int main(int argc, char* argv[])
 {
     /* Log file is NOT opened until after config load. SH_DBG calls before
      * that point are silently no-ops (the macro short-circuits on a NULL
-     * handle). Avoids creating SilentHill.log when enable_debug_log=0. */
+     * handle). Avoids creating SilentHill.log when enable_debug_log=0.
+     * The relaunch hook is registered first so it runs last of all. */
+    atexit(PsyX_Backend_RelaunchAtExit);
     atexit(Sh_LogAtExitFlush);
     Sh_InstallCrashFilter();
 
@@ -739,6 +748,14 @@ int main(int argc, char* argv[])
     /* Load config file */
     PcConfig_Load("config.cfg");
     PcAudioConfig_Load("config.cfg");
+
+    /* The relaunch after a lost Vulkan/D3D11 device passes "-renderer gl";
+     * config.cfg itself is not rewritten, the user's choice stays theirs. */
+    if (s_RendererArg)
+    {
+        strncpy(g_PcConfig.renderer, s_RendererArg, sizeof(g_PcConfig.renderer) - 1);
+        g_PcConfig.renderer[sizeof(g_PcConfig.renderer) - 1] = '\0';
+    }
 
     /* After the config load, or the parsed skip_intros would clobber it.
      * map0_s00 is the compiled-in default, so a config still naming it counts as
