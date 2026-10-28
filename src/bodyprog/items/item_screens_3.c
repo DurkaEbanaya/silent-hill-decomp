@@ -1805,6 +1805,33 @@ static inline s16 GetUvOrRandom(void)
     }
 }
 
+#ifdef SH_PC_PORT
+/* The animated health gradients can extend below the portrait into the item
+ * carousel. Clip their colours as well as their geometry, preserving the scan
+ * animation instead of painting a subtractive rectangle over nearby models. */
+static void Inventory_HealthGradientClip(POLY_G4* poly)
+{
+    int y0 = poly->y0;
+    int y1 = poly->y1;
+    int a = CLAMP(y0, -184, -50);
+    int b = CLAMP(y1, -184, -50);
+    if (y0 != y1)
+    {
+#define HEALTH_CLIP_CHANNEL(c, n, m) do { \
+        int first = poly->c##n; \
+        int delta = (int)poly->c##m - first; \
+        poly->c##n = first + delta * (a - y0) / (y1 - y0); \
+        poly->c##m = first + delta * (b - y0) / (y1 - y0); \
+    } while (0)
+        HEALTH_CLIP_CHANNEL(r, 0, 1); HEALTH_CLIP_CHANNEL(g, 0, 1); HEALTH_CLIP_CHANNEL(b, 0, 1);
+        HEALTH_CLIP_CHANNEL(r, 2, 3); HEALTH_CLIP_CHANNEL(g, 2, 3); HEALTH_CLIP_CHANNEL(b, 2, 3);
+#undef HEALTH_CLIP_CHANNEL
+    }
+    poly->y0 = poly->y2 = a;
+    poly->y1 = poly->y3 = b;
+}
+#endif
+
 void Gfx_Inventory_HealthStatusDraw(void) // 0x80051020
 {
     s32       tempOverlayY;
@@ -1962,6 +1989,9 @@ void Gfx_Inventory_HealthStatusDraw(void) // 0x80051020
         overlayYPos = -52;
     }
 
+#ifdef SH_PC_PORT
+    Inventory_HealthGradientClip(poly_g4);
+#endif
     addPrim(&ot->org[2036], poly_g4);
     GsOUT_PACKET_P = (PACKET*)poly_g4 + sizeof(POLY_G4);
 
@@ -2036,6 +2066,9 @@ void Gfx_Inventory_HealthStatusDraw(void) // 0x80051020
                     -56,  overlayYPos);
             }
 
+#ifdef SH_PC_PORT
+            Inventory_HealthGradientClip(poly_g4);
+#endif
             addPrim(&ot->org[2040], poly_g4);
             GsOUT_PACKET_P = (PACKET*)poly_g4 + sizeof(POLY_G4);
         }
