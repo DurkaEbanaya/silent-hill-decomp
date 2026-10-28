@@ -494,6 +494,9 @@ const char* Pc_LangMenuText(const char* str)
 
         if (tr != NULL)
             return tr;
+        tr = Pc_JpnUiText(str);
+        if (tr != NULL)
+            return tr;
         /* Not in the pack: a de/fr/es/it pack still has a column below. */
     }
 
