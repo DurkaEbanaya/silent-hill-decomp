@@ -268,7 +268,14 @@ void Pc_InventoryDraw(const PcTitlePainter* painter)
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     }
     painter->rect(0,0,w,h,w,h,0,0,0,1);
+    /* These are completed framebuffer panels, not transparent source sprites.
+     * Their alpha can retain PSX texel/blend metadata even where the RGB was
+     * drawn opaquely. Copy the finished colour without blending it a second
+     * time; restore blending before drawing the native labels and selectors. */
+    GLboolean panelBlend=glIsEnabled(GL_BLEND);
+    glDisable(GL_BLEND);
     for(int i=0;i<n-1;i++)painter->image(tiles[i],p[i].x-(i==0?p[i].w*.105f:0),p[i].y+p[i].h,p[i].w,-p[i].h,w,h,1,1,1,1);
+    if(panelBlend)glEnable(GL_BLEND);
     /* The legacy strips cross the old panel boundaries. Do not magnify those
      * clipped fragments: replace this narrow decoration band consistently. */
     painter->rect(0,h*.075f,w,h*.042f,w,h,0,0,0,1);
