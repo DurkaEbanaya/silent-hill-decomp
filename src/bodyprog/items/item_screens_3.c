@@ -4138,6 +4138,7 @@ void Gfx_Items_Display(s_TmdFile* tmd, s32 displayItemIdx, s32 loadableItemIdx)
         }
         if (obj != NULL) {
             u8 modernItemId = Pc_ItemUnq_TakeRequestedItemId(loadableItemIdx);
+            Pc_ItemUnq_FixLiquidUvs(modernItemId, obj);
 
             GsLinkObject4_PC(obj, &g_Items_ItemsModelData[displayItemIdx]);
             if (modernItemId != InvItemId_Unequipped &&
@@ -4387,6 +4388,7 @@ void func_80054A04(u8 itemId) // 0x80054A04
             }
             if (_obj != NULL) {
                 D_800C3E08.id = 0;
+                Pc_ItemUnq_FixLiquidUvs(D_800AE187, _obj);
                 GsLinkObject4_PC(_obj, &D_800C3E08);
                 Pc_ModernMesh_LinkObject(Pc_ItemUnq_FromItemId(D_800AE187), &D_800C3E08);
             } else {
