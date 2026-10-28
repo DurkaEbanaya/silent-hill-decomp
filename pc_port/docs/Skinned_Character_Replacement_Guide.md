@@ -204,7 +204,7 @@ The cut is hard-edged. Soft, blended alpha is not supported.
 ## Lighting and normal maps
 
 The game lights the model with its own lights, the same ones that light Harry. By
-default this runs per pixel. Set **Character Lighting** to Per Vertex in the F10 quick
+default this runs per pixel. Set **Addon Character Lighting** to Per Vertex in the F10 quick
 menu (Graphics page 2), or `chara_per_pixel_light = 0` in the config, to light it per
 vertex like the stock characters.
 

@@ -135,7 +135,7 @@ static const QoRowDef s_pageGfx2[] = {
     { ROW_EXTRA, NULL, QO_X_SHADOW,         "Shadow Resolution" },
     { ROW_EXTRA, NULL, QO_X_DREAMBLUR,      "Dream Blur" },  /* not in the PC Options table: that page is full */
     { ROW_EXTRA, NULL, QO_X_DREAMSTR,       "Dream Blur Strength" },
-    { ROW_EXTRA, NULL, QO_X_CHARALIGHT,     "Character Lighting" },
+    { ROW_EXTRA, NULL, QO_X_CHARALIGHT,     "Addon Character Lighting" },
     { ROW_EXTRA, NULL, QO_X_PPLIGHT,        "Per-Pixel Lighting" },
     { ROW_EXTRA, NULL, QO_X_HEROLIGHT,      "Hero Light" },
     QO_NAV_ROW,
