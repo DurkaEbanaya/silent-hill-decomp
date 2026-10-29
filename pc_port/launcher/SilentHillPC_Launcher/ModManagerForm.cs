@@ -970,7 +970,9 @@ namespace SilentHillPC_Launcher
             try
             {
                 ProgressDialog.RunCancellable(this, Loc.F("Extracting {0}…", Path.GetFileName(binPath)),
-                    (r, cancelled) => { res = BinExtractor.Extract(binPath, outDir, convertPng, deleteTim, r, cancelled); });
+                    // The composites are built FROM the .TIMs, so a delete has to wait
+                    // until they are done (DeleteConvertedTims below).
+                    (r, cancelled) => { res = BinExtractor.Extract(binPath, outDir, convertPng, deleteTim && !buildRefs, r, cancelled); });
             }
             catch (Exception ex)
             {
@@ -995,18 +997,15 @@ namespace SilentHillPC_Launcher
             }
 
             ClutComposer.ComposeAllResult refRes = null;
-            string refDir = null;
             if (buildRefs)
             {
                 try
                 {
                     string tree = outDir;
-                    refDir = ReferenceTreeFor(outDir);
-                    string dst = refDir;
                     ProgressDialog.RunCancellable(this, Loc.T("Building reference composites…"), (r, cancelled) =>
                     {
                         var idx = ClutComposer.EnsureIndex(tree, (i, n, m) => r(i, n, Loc.F("Indexing {0}", m)));
-                        refRes = ClutComposer.ComposeAll(idx, dst, (i, n, m) => r(i, n, m), cancelled);
+                        refRes = ClutComposer.ComposeAll(idx, null, (i, n, m) => r(i, n, m), cancelled);
                     });
                 }
                 catch (Exception ex)
@@ -1014,6 +1013,7 @@ namespace SilentHillPC_Launcher
                     MessageBox.Show(this, Loc.F("Extraction finished, but building reference composites failed:\n\n{0}", ex.Message),
                         Loc.T("Extract BIN"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
+                if (deleteTim) res.TexturesDeleted = DeleteConvertedTims(outDir);
             }
 
             string msg = (string.IsNullOrEmpty(res.ReleaseId)
@@ -1026,8 +1026,8 @@ namespace SilentHillPC_Launcher
             }
             if (buildRefs && refRes != null)
             {
-                msg += Loc.F("{0} reference image(s) in:\n{1}", refRes.Made + refRes.Flat, refDir) + "\n";
-                msg += InstallableNote(refRes) + "\n";
+                msg += Loc.F("Built {0} reference composite(s).", refRes.Made + refRes.Flat) + "\n";
+                msg += InstallableNote() + "\n";
             }
             msg += "\n" + Loc.T("Output folder:") + "\n" + outDir;
             if (res.Warnings.Count > 0)
@@ -1487,9 +1487,9 @@ namespace SilentHillPC_Launcher
                                         "composite can show only one. Edit the per-row {1}.pNN.png set instead.",
                                         res.SharedPct, Path.GetFileName(t.TimPath));
             else if (res.Kind != "flat-multirow")
-                what += "\n\n" + Loc.F("Or skip \"Rebuild…\": install your edit directly as {0}.png (or BC7 {0}.dds), " +
-                                        "at any upscale, in the texture's folder under gamedata\\load. One image " +
-                                        "covers every palette of the texture.",
+                what += "\n\n" + Loc.F("Or skip \"Rebuild…\": install your edit directly as {0}_reference.png (or BC7 " +
+                                        "{0}_reference.dds), at any upscale, in the texture's folder under gamedata\\load. " +
+                                        "One image covers every palette of the texture.",
                                         Path.GetFileNameWithoutExtension(t.TimPath));
             if (MessageBox.Show(this, what + "\n\n" + Loc.F("Paint over it, then \"{0}\". Open it now?", Loc.T("Rebuild…")),
                     Loc.T("Reference"), MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
@@ -1590,7 +1590,7 @@ namespace SilentHillPC_Launcher
             if (res.TooShared > 0)
                 msg += "\n" + Loc.F("{0} sheet(s) are over {1:F0}% shared — for those, edit the per-row " +
                                     "pNN.png set, not the composite.", res.TooShared, ClutComposer.SharedWarnPct);
-            msg += "\n\n" + InstallableNote(res);
+            msg += "\n\n" + InstallableNote();
             if (MessageBox.Show(this, msg + "\n\n" + Loc.T("Open the folder?"), Loc.T("Reference"),
                     MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
             {
@@ -1703,37 +1703,51 @@ namespace SilentHillPC_Launcher
             ConverterActions.OpenAudioTool(this, _gameRoot);
         }
 
-        /// <summary>Best-effort guess of the texture or model a reference PNG came from
-        /// (NAME_reference.png -> NAME.TIM / .ILM / .PLM / .IPD beside it). The .TIM wins:
-        /// it is the target that gets the whole-corpus palette-row union.</summary>
         private const string CompositeInstallHelp =
             "INSTALLING A COMPOSITE DIRECTLY (upscales, BC7)\n" +
             "\n" +
-            "    \"Reference ▾ → Every texture…\" (or the reference box in \"Extract BIN…\")\n" +
-            "    writes a folder named after your extracted one plus _reference, laid out\n" +
-            "    like the disc. Every NAME.png in it is the complete in-game image of that\n" +
-            "    texture. Upscale or repaint it and install it as it is: BG\\NAME.png goes\n" +
-            "    to gamedata\\load\\BG\\NAME.png, or into a mod's load folder. That one image\n" +
-            "    replaces every palette of the texture, so there is no pNN.png set to make.\n" +
-            "    For BC7, convert it to NAME.dds; a .dds wins over a .png of the same name.\n" +
+            "    A reference composite (NAME_reference.png, from \"Reference ▾\" or the\n" +
+            "    reference box in \"Extract BIN…\") is the complete in-game image of its\n" +
+            "    texture. Upscale or repaint it and install it under the same name: BG's\n" +
+            "    NAME_reference.png goes to gamedata\\load\\BG\\, or into a mod's load folder.\n" +
+            "    That one image replaces every palette of the texture, so there is no\n" +
+            "    pNN.png set to make. For BC7, convert it to NAME_reference.dds.\n" +
             "\n" +
-            "    Files left as NAME_reference.png draw several palettes over the same\n" +
-            "    pixels, which one image cannot hold: use \"Rebuild…\" for those. A per-row\n" +
-            "    NAME.TIM.pNN.png set, where one is installed, wins over NAME.png.";
+            "    The exception is a sheet reported as over 20% shared: it draws several\n" +
+            "    palettes over the same pixels, which one image cannot hold, so use\n" +
+            "    \"Rebuild…\" for it. A per-row NAME.TIM.pNN.png set, or a NAME.png, wins\n" +
+            "    over a NAME_reference.png for the same texture.";
+
+        /// <summary>The extractor's "delete original TIM", deferred past the composites: removes
+        /// each .TIM under <paramref name="root"/> whose converted PNG sits beside it (FOO.png or
+        /// the per-row FOO.TIM.p00.png), the same rule the extractor applies.</summary>
+        private static int DeleteConvertedTims(string root)
+        {
+            int n = 0;
+            foreach (string tim in Directory.EnumerateFiles(root, "*.TIM", SearchOption.AllDirectories))
+            {
+                string png = Path.Combine(Path.GetDirectoryName(tim), Path.GetFileNameWithoutExtension(tim) + ".png");
+                if (!File.Exists(png) && !File.Exists(tim + ".p00.png")) continue;
+                try { File.Delete(tim); n++; } catch { }
+            }
+            return n;
+        }
 
         private static string ReferenceTreeFor(string tree)
         {
             return tree.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "_reference";
         }
 
-        private static string InstallableNote(ClutComposer.ComposeAllResult res)
+        private static string InstallableNote()
         {
-            return Loc.F("{0} of them are named NAME.png and install as they are, at any upscale: copy " +
-                         "the folders you edited (BG, CHARA…) into gamedata\\load or a mod's load folder, " +
-                         "or convert them to BC7 .dds first. One image covers every palette of its texture. " +
-                         "Files still named NAME_reference.png need \"Rebuild…\".", res.Installable);
+            return Loc.T("Each NAME_reference.png installs as it is, at any upscale: copy the ones you " +
+                         "edited into the texture's folder under gamedata\\load (or a mod's load folder), " +
+                         "or convert them to BC7 .dds first. One image covers every palette of its texture.");
         }
 
+        /// <summary>Best-effort guess of the texture or model a reference PNG came from
+        /// (NAME_reference.png -> NAME.TIM / .ILM / .PLM / .IPD beside it). The .TIM wins:
+        /// it is the target that gets the whole-corpus palette-row union.</summary>
         private static string GuessSourceFor(string png)
         {
             string dir = Path.GetDirectoryName(png) ?? ".";

@@ -1220,7 +1220,6 @@ namespace SilentHillPC_Launcher
             public int Flat;            // plain decodes (no model references the sheet)
             public int Failed;
             public int TooShared;       // sheets a composite would mislead on (SharedWarnPct)
-            public int Installable;     // written as NAME.png, ready for gamedata/load
             public bool Cancelled;
             public readonly List<string> Failures = new List<string>();
             public readonly SortedDictionary<string, ClassStat> Classes =
@@ -1228,27 +1227,6 @@ namespace SilentHillPC_Launcher
             public long Covered, Total, Shared, SharedBase;
             public double CoveragePct { get { return Total > 0 ? 100.0 * Covered / Total : 0.0; } }
             public double SharedPct { get { return SharedBase > 0 ? 100.0 * Shared / SharedBase : 0.0; } }
-        }
-
-        /// <summary>In a mirrored output tree, rename a composite the game can take whole to
-        /// NAME.png, so the tree drops straight into gamedata/load (or converts to NAME.dds).
-        /// A lone NAME.png covers every palette row of its texture, which is exactly right
-        /// for a composite. Not for a too-shared sheet, whose palette variants it would
-        /// flatten into one, nor a multi-row sheet no model draws, which has no composite
-        /// at all: those stay NAME_reference.png and go through Rebuild.</summary>
-        private static void PlaceForInstall(ComposeResult r, ComposeAllResult res)
-        {
-            bool whole = (r.Kind == "composite" && !r.TooShared) || r.Kind == "flat";
-            string dir = Path.GetDirectoryName(r.Path);
-            string stem = Path.GetFileNameWithoutExtension(r.Path);
-            if (stem.EndsWith("_reference", StringComparison.OrdinalIgnoreCase))
-                stem = stem.Substring(0, stem.Length - "_reference".Length);
-            string install = Path.Combine(dir, stem + ".png");
-            if (!whole) return;
-            if (File.Exists(install)) File.Delete(install);
-            File.Move(r.Path, install);
-            r.Path = install;
-            res.Installable++;
         }
 
         private static string ClassOf(string rel)
@@ -1259,8 +1237,7 @@ namespace SilentHillPC_Launcher
 
         /// <summary>Every TIM in the tree, in one pass. <paramref name="outDir"/> null writes
         /// NAME_reference.png beside each source .TIM; otherwise it mirrors the tree under
-        /// outDir, with each sheet the game can take whole named NAME.png (PlaceForInstall).
-        /// Beside the .TIMs that name would collide with the TIM->PNG conversion. Returns as soon as <paramref name="cancelled"/> goes true.</summary>
+        /// outDir. Returns as soon as <paramref name="cancelled"/> goes true.</summary>
         public static ComposeAllResult ComposeAll(ClutIndex idx, string outDir,
                                                   Action<int, int, string> report, Func<bool> cancelled)
         {
@@ -1297,7 +1274,6 @@ namespace SilentHillPC_Launcher
                     continue;
                 }
                 if (r.Kind == "composite") res.Made++; else res.Flat++;
-                if (outDir != null) PlaceForInstall(r, res);
 
                 string cls = ClassOf(rel);
                 ClassStat cs;

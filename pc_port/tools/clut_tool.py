@@ -823,16 +823,6 @@ def _class_of(rel):
     return d.split("/")[0] if d else "."
 
 
-def _place_for_install(path):
-    """NAME_reference.png -> NAME.png: the name the game loads whole, covering every
-    palette row of the texture. Only for sheets one image can stand for - see
-    ClutComposer.PlaceForInstall."""
-    d, f = os.path.split(path)
-    dst = os.path.join(d, f[:-len("_reference.png")] + ".png")
-    os.replace(path, dst)
-    return dst
-
-
 def compose_all(idx, out_dir, only=None, exclude_shared=None):
     root = idx["root"]
     rels = sorted(idx["tims"])
@@ -857,8 +847,6 @@ def compose_all(idx, out_dir, only=None, exclude_shared=None):
             print("   FAILED %s: %s" % (rel, ex), file=sys.stderr)
             continue
         r["kind"] = "composite"
-        if not r["skipped"] and r["sharedPct"] <= SHARED_WARN_PCT:
-            r["path"] = _place_for_install(dst)
         stats[rel] = r
         done += 1
         if done % 50 == 0:
@@ -879,8 +867,6 @@ def compose_all(idx, out_dir, only=None, exclude_shared=None):
                            os.path.splitext(os.path.basename(rel))[0] + "_reference.png")
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         write_png_rgba(dst, w, h, rgba)
-        if rows <= 1:
-            dst = _place_for_install(dst)
         # sharedBase 0: a flat sheet has no row map, so "how many rows draw this texel"
         # is not a question about it - it must not dilute the class averages either.
         stats[rel] = dict(path=dst, w=w, h=h, covered=w * h, total=w * h, rows=[0],
