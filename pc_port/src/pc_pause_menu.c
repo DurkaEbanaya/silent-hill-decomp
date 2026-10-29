@@ -22,7 +22,6 @@ extern void PsyX_SPUAL_SetKeyOnMasterExempt(int on);
 #define PM_HEADER_Y  64
 #define PM_ROW_Y     96
 #define PM_ROW_PITCH 20 /* the title's MAINMENU_ROW_PITCH */
-#define PM_REASON_Y  224
 #define PM_CONFIRM_Y 104
 #define PM_ANSWER_DY 24
 #define PM_TEXT_H    16
@@ -36,7 +35,9 @@ static int    s_open;
 static s32    s_blink;
 static int    s_returnPending;
 /* QUICK MENU resumes first and opens the panel once gameplay is live again:
- * F10 only ever opens it over the running game, never over the pause. */
+ * F10 only ever opens it over the running game, never over the pause. Not
+ * cleared by Pc_PauseMenu_Reset, which game_sys_states.c calls on every
+ * unpaused tick and so dropped the request before it could open. */
 static int    s_quickMenuPending;
 /* SAVE, LOAD or EXIT -> Yes chosen; carried out once the fade-out is black. */
 static PmAction s_fadeAct;
@@ -120,7 +121,6 @@ void Pc_PauseMenu_Reset(void)
     }
     PsyX_SPUAL_SetKeyOnMasterExempt(0);
     s_returnPending        = 0;
-    s_quickMenuPending     = 0;
     g_PsxFreezeCaptureHold = 0;
     s_open                 = 0;
     s_blink                = 0;
@@ -144,8 +144,11 @@ void Pc_PauseMenu_AwayUpdate(void)
      * leaves the game's audio under the mute. */
     PsyX_SPUAL_SetKeyOnMasterExempt(s_returnPending && onScreen);
 
-    if (s_quickMenuPending && state == GameState_InGame && g_SysWork.sysState == SysState_Gameplay &&
-        !g_PcFreezeReleasePending)
+    if (s_quickMenuPending && state != GameState_InGame)
+    {
+        s_quickMenuPending = 0;
+    }
+    if (s_quickMenuPending && g_SysWork.sysState == SysState_Gameplay && !g_PcFreezeReleasePending)
     {
         s_quickMenuPending = 0;
         if (!Pc_QuickOptions_IsOpen())
@@ -157,9 +160,8 @@ void Pc_PauseMenu_AwayUpdate(void)
 
 static void PauseMenu_Draw(void)
 {
-    unsigned    mask = PmMenu_EnabledMask(&s_menu);
-    const char* reason;
-    int         i;
+    unsigned mask = PmMenu_EnabledMask(&s_menu);
+    int      i;
 
     if (s_menu.confirm.open)
     {
@@ -177,12 +179,6 @@ static void PauseMenu_Draw(void)
         MarkedLabelDraw(160, PM_ROW_Y + (i * PM_ROW_PITCH),
                         (mask & (1u << i)) ? StringColorId_White : StringColorId_DarkGrey,
                         s_RowLabels[i], i == s_menu.sel);
-    }
-
-    reason = PmBlock_Reason(s_menu.block);
-    if (reason != NULL)
-    {
-        Nm_TextDrawCentered(160, PM_REASON_Y, NM_TEXT_TALL, StringColorId_LightGrey, reason);
     }
 }
 
@@ -290,7 +286,7 @@ void Pc_PauseMenu_Update(void)
     else
     {
         hoverRow = Pc_MouseCursor_MenuRowHover(PM_ROW_Y, PM_ROW_PITCH, PM_ROW_COUNT,
-                                               PmMenu_EnabledMask(&s_menu), NULL);
+                                               (1u << PM_ROW_COUNT) - 1u, NULL);
     }
 
     act = PmMenu_Update(&s_menu, &in, hoverRow, hoverAnswer);
@@ -306,6 +302,12 @@ void Pc_PauseMenu_Update(void)
 
         case PM_ACT_EXIT_NO:
             PauseMenu_Sfx(Sfx_MenuCancel);
+            break;
+
+        case PM_ACT_BLOCKED:
+            PauseMenu_Sfx(Sfx_MenuCancel);
+            SH_DBG_ECHO("Can't %s %s", (s_menu.sel == PM_ROW_LOAD) ? "load" : "save",
+                        (s_menu.block == PM_BLOCK_BOSS) ? "during a boss fight" : "in a randomizer run");
             break;
 
         case PM_ACT_RESUME:

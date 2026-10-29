@@ -20,6 +20,8 @@ unsigned PmMenu_EnabledMask(const PmMenu* m)
 
 static PmAction Activate(PmMenu* m, int row)
 {
+    if (!(PmMenu_EnabledMask(m) & (1u << row)))
+        return PM_ACT_BLOCKED;
     switch (row) {
     case PM_ROW_CONTINUE: return PM_ACT_RESUME;
     case PM_ROW_QUICK_MENU: return PM_ACT_QUICK_MENU;
@@ -35,13 +37,7 @@ static PmAction Activate(PmMenu* m, int row)
 
 static int Step(const PmMenu* m, int dir)
 {
-    unsigned mask = PmMenu_EnabledMask(m);
-    int i, row = m->sel;
-    for (i = 0; i < PM_ROW_COUNT; i++) {
-        row = (row + dir + PM_ROW_COUNT) % PM_ROW_COUNT;
-        if (mask & (1u << row)) return row;
-    }
-    return m->sel;
+    return (m->sel + dir + PM_ROW_COUNT) % PM_ROW_COUNT;
 }
 
 NmInput PmConfirm_ApplyHover(NmConfirm* c, const NmInput* in, int hoverAnswer)
@@ -57,7 +53,6 @@ NmInput PmConfirm_ApplyHover(NmConfirm* c, const NmInput* in, int hoverAnswer)
 
 PmAction PmMenu_Update(PmMenu* m, const NmInput* rawIn, int hoverRow, int hoverAnswer)
 {
-    unsigned mask = PmMenu_EnabledMask(m);
     NmInput pin = *rawIn;
     const NmInput* in = &pin;
     int hoverOk;
@@ -79,7 +74,7 @@ PmAction PmMenu_Update(PmMenu* m, const NmInput* rawIn, int hoverRow, int hoverA
 
     if (in->cancel || in->mouseRight) return PM_ACT_RESUME;
 
-    hoverOk = hoverRow >= 0 && hoverRow < PM_ROW_COUNT && (mask & (1u << hoverRow));
+    hoverOk = hoverRow >= 0 && hoverRow < PM_ROW_COUNT;
     if (hoverOk && in->mouseLeft) {
         m->sel = hoverRow;
         return Activate(m, hoverRow);
@@ -99,13 +94,4 @@ PmAction PmMenu_Update(PmMenu* m, const NmInput* rawIn, int hoverRow, int hoverA
         return PM_ACT_MOVED;
     }
     return PM_ACT_NONE;
-}
-
-const char* PmBlock_Reason(PmBlock b)
-{
-    switch (b) {
-    case PM_BLOCK_BOSS:  return "Cannot_save_during_a_boss_fight";
-    case PM_BLOCK_RANDO: return "Cannot_save_in_a_randomizer_run";
-    default:             return NULL;
-    }
 }
