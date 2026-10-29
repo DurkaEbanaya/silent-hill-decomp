@@ -1768,6 +1768,7 @@ MENU.No=Нет
 MENU.YES=ДА
 MENU.NO=НЕТ
 MENU.SAVE=СОХРАНИТЬ
+MENU.QUICK_MENU=БЫСТРОЕ_МЕНЮ
 MENU.RETURN_TO_THE_TITLE_SCREEN?=ВЫЙТИ_В_ГЛАВНОЕ_МЕНЮ?
 MENU.QUIT_THE_GAME?=ВЫЙТИ_ИЗ_ИГРЫ?
 MENU.Cannot_save_during_a_boss_fight=Нет_сохранения_в_бою_с_боссом

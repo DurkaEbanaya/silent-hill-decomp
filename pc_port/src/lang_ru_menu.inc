@@ -332,6 +332,7 @@
 { "YES",             "ДА" },
 { "NO",              "НЕТ" },
 { "SAVE",            "СОХРАНЕНИЕ" },
+{ "QUICK_MENU",      "БЫСТРОЕ_МЕНЮ" },
 { "RETURN_TO_THE_TITLE_SCREEN?",     "ВЫЙТИ_В_ГЛАВНОЕ_МЕНЮ?" },
 { "QUIT_THE_GAME?",                  "ВЫЙТИ_ИЗ_ИГРЫ?" },
 { "Cannot_save_during_a_boss_fight", "Нет_сохранения_в_бою_с_боссом" },

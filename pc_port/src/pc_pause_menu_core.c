@@ -22,6 +22,7 @@ static PmAction Activate(PmMenu* m, int row)
 {
     switch (row) {
     case PM_ROW_CONTINUE: return PM_ACT_RESUME;
+    case PM_ROW_QUICK_MENU: return PM_ACT_QUICK_MENU;
     case PM_ROW_SAVE:     return PM_ACT_SAVE;
     case PM_ROW_LOAD:     return PM_ACT_LOAD;
     case PM_ROW_OPTION:   return PM_ACT_OPTION;

@@ -109,6 +109,7 @@ static const s_MenuTranslation s_MenuTr[] = {
 
     /* --- Pause menu --- */
     { "SAVE",                            { "SPEICHERN", "SAUVEGARDER", "GUARDAR", "SALVA" } },
+    { "QUICK_MENU",                      { "SCHNELLMENÜ", "MENU_RAPIDE", "MENU_RAPIDO", "MENU_RAPIDO" } },
     /* FONT16 only has capital A-acute, A/O/U-diaeresis and E-acute; any other
      * capital accent draws as a mark over '*', so those lose the accent. ES/IT
      * are shortened: the full sentences passed 300 px in capitals. */

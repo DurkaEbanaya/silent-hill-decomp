@@ -7,9 +7,9 @@
 /* Renderer-free model of the in-game pause menu. SAVE/LOAD are disabled
  * (skipped by navigation, ignored by the mouse) while a block reason is set. */
 
-typedef enum { PM_ROW_CONTINUE, PM_ROW_SAVE, PM_ROW_LOAD, PM_ROW_OPTION, PM_ROW_EXIT, PM_ROW_COUNT } PmRow;
+typedef enum { PM_ROW_CONTINUE, PM_ROW_QUICK_MENU, PM_ROW_SAVE, PM_ROW_LOAD, PM_ROW_OPTION, PM_ROW_EXIT, PM_ROW_COUNT } PmRow;
 typedef enum { PM_BLOCK_NONE, PM_BLOCK_RANDO, PM_BLOCK_BOSS } PmBlock;
-typedef enum { PM_ACT_NONE, PM_ACT_MOVED, PM_ACT_RESUME, PM_ACT_SAVE, PM_ACT_LOAD,
+typedef enum { PM_ACT_NONE, PM_ACT_MOVED, PM_ACT_RESUME, PM_ACT_QUICK_MENU, PM_ACT_SAVE, PM_ACT_LOAD,
                PM_ACT_OPTION, PM_ACT_EXIT_ASK, PM_ACT_EXIT_NO, PM_ACT_EXIT_YES } PmAction;
 /* opening: set by PmMenu_Open, cleared by the next PmMenu_Update. */
 typedef struct { int sel; PmBlock block; NmConfirm confirm; int opening; } PmMenu;

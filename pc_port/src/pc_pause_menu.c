@@ -10,6 +10,7 @@
 #include "pc_native_menu_draw.h"
 #include "pc_pause_menu.h"
 #include "pc_pause_menu_core.h"
+#include "pc_quick_options.h"
 #include "pc_quicksave.h"
 #include "pc_rando.h"
 
@@ -21,12 +22,12 @@ extern void PsyX_SPUAL_SetKeyOnMasterExempt(int on);
 #define PM_HEADER_Y  64
 #define PM_ROW_Y     96
 #define PM_ROW_PITCH 20 /* the title's MAINMENU_ROW_PITCH */
-#define PM_REASON_Y  204
+#define PM_REASON_Y  224
 #define PM_CONFIRM_Y 104
 #define PM_ANSWER_DY 24
 #define PM_TEXT_H    16
 
-static const char* const s_RowLabels[PM_ROW_COUNT] = { "CONTINUE", "SAVE", "LOAD", "OPTION", "EXIT" };
+static const char* const s_RowLabels[PM_ROW_COUNT] = { "CONTINUE", "QUICK_MENU", "SAVE", "LOAD", "OPTION", "EXIT" };
 static const char* const s_AnswerLabels[2]         = { "YES", "NO" };
 static const int         s_AnswerCx[2]             = { 120, 200 };
 
@@ -34,6 +35,9 @@ static PmMenu s_menu;
 static int    s_open;
 static s32    s_blink;
 static int    s_returnPending;
+/* QUICK MENU resumes first and opens the panel once gameplay is live again:
+ * F10 only ever opens it over the running game, never over the pause. */
+static int    s_quickMenuPending;
 /* SAVE, LOAD or EXIT -> Yes chosen; carried out once the fade-out is black. */
 static PmAction s_fadeAct;
 
@@ -116,6 +120,7 @@ void Pc_PauseMenu_Reset(void)
     }
     PsyX_SPUAL_SetKeyOnMasterExempt(0);
     s_returnPending        = 0;
+    s_quickMenuPending     = 0;
     g_PsxFreezeCaptureHold = 0;
     s_open                 = 0;
     s_blink                = 0;
@@ -138,6 +143,16 @@ void Pc_PauseMenu_AwayUpdate(void)
      * notes key on from the sequencer thread), so arming for the whole screen
      * leaves the game's audio under the mute. */
     PsyX_SPUAL_SetKeyOnMasterExempt(s_returnPending && onScreen);
+
+    if (s_quickMenuPending && state == GameState_InGame && g_SysWork.sysState == SysState_Gameplay &&
+        !g_PcFreezeReleasePending)
+    {
+        s_quickMenuPending = 0;
+        if (!Pc_QuickOptions_IsOpen())
+        {
+            Pc_QuickOptions_Toggle();
+        }
+    }
 }
 
 static void PauseMenu_Draw(void)
@@ -294,6 +309,7 @@ void Pc_PauseMenu_Update(void)
             break;
 
         case PM_ACT_RESUME:
+        case PM_ACT_QUICK_MENU:
             PauseMenu_Sfx((in.cancel || in.mouseRight) ? Sfx_MenuCancel : Sfx_MenuConfirm);
             SD_Call(4);
             /* Releasing on this tick showed one bare fog-colored frame: the world
@@ -302,7 +318,8 @@ void Pc_PauseMenu_Update(void)
              * release to MainLoop, which waits for a tick that drew. */
             g_PcFreezeReleasePending = 1;
             Pc_PauseMenu_Reset();
-            SH_DBG("[PAUSE] resume");
+            s_quickMenuPending = (act == PM_ACT_QUICK_MENU);
+            SH_DBG("[PAUSE] resume%s", s_quickMenuPending ? " -> quick menu" : "");
             SysWork_StateSetNext(SysState_Gameplay);
             return;
 
