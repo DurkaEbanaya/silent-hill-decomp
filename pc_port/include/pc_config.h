@@ -538,6 +538,11 @@ typedef struct {
      * (config key: hero_light) */
     int  heroLight;
 
+    /* 1 keeps that fill on while the flashlight is lit; 0 (default) drops it
+     * then, since the beam already lights the character and the two together
+     * read as a double light. (config key: hero_light_flashlight) */
+    int  heroLightWithFlashlight;
+
     /* Strength of that blur: the gain of its feedback loop, 0 to 1. 1.0 is
      * hardware, where the overlay's own 50/50 composite is the only decay.
      * Lower fades the ghost faster. (config key: dream_blur_strength) */

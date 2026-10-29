@@ -2431,6 +2431,13 @@ void MainLoop(void) // 0x80032EE0
             Pc_RearLookUpdate();
         }
 
+        /* Hero light: re-derived each frame, as it drops out while the
+         * flashlight is lit unless hero_light_flashlight keeps it. */
+        {
+            extern void Pc_PpLit_Apply(void);
+            Pc_PpLit_Apply();
+        }
+
         /* "Disable D-pad for movement" applies ONLY during gameplay, so the D-pad
          * still navigates menus / inventory / the map. Re-evaluated every frame.
          * The quick options overlay (and the controls panel it opens) sits on

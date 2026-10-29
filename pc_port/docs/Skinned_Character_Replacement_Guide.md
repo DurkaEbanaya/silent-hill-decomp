@@ -241,7 +241,9 @@ occlusion, use a glTF Material Output node group's Occlusion input.
 default 2) adds a soft fill light from above the camera to characters lit per pixel. It
 gives a model shape in flat daylight, where the game lights a character with one colour,
 and lets its normal map show in dim rooms. Set it to Off for the game's own lighting
-only.
+only. It switches off while the flashlight is on, since the beam already lights the
+character and the two together look doubled. Turn on **Hero Light with Flashlight**
+(`hero_light_flashlight = 1`) to keep it.
 
 **Per-Pixel Lighting** (same page; `per_pixel_lighting = 1`, off by default) does the
 same per-pixel lighting for the stock world and the stock characters, and the hero light

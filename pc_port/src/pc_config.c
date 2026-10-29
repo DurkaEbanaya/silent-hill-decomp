@@ -1272,6 +1272,10 @@ else if (strcmp(key, "enable_plugins") == 0)
         {
             g_PcConfig.perPixelLighting = (atoi(value) != 0);
         }
+        else if (strcmp(key, "hero_light_flashlight") == 0)
+        {
+            g_PcConfig.heroLightWithFlashlight = atoi(value) != 0;
+        }
         else if (strcmp(key, "hero_light") == 0)
         {
             g_PcConfig.heroLight = atoi(value);
