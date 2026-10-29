@@ -528,6 +528,13 @@ typedef struct {
      * (config key: chara_per_pixel_light) */
     int  charaPerPixelLight;
 
+    /* The game's own human characters blink, move their mouths to their
+     * voice lines and breathe: their face and chest drawn from the port's
+     * gamedata/builtin/CHARA models instead of the stock parts. A replacement
+     * in load/CHARA still takes over. Applies live.
+     * (config key: chara_face_anim) */
+    int  charaFaceAnim;
+
     /* Stock world and characters lit per pixel: the GTE light sum the PSX runs
      * per vertex, run per fragment instead. Off by default; applies live.
      * (config key: per_pixel_lighting) */

@@ -552,7 +552,7 @@ enum { QO_X_SHADOW = 0, QO_X_SPEAKERS, QO_X_BGM, QO_X_SFX,
        QO_X_TPSRESTX, QO_X_TPSRESTY, QO_X_TPSAIMX, QO_X_TPSAIMY,
        QO_X_OTSRESTX, QO_X_OTSRESTY, QO_X_OTSAIMX, QO_X_OTSAIMY,
        QO_X_DREAMSTR, QO_X_DREAMBLUR, QO_X_DPADMOVE, QO_X_CROSSHAIRSTYLE,
-       QO_X_LINEGAP, QO_X_CHARALIGHT, QO_X_PPLIGHT, QO_X_HEROLIGHT, QO_X_HEROLIGHTFL };
+       QO_X_LINEGAP, QO_X_CHARALIGHT, QO_X_PPLIGHT, QO_X_HEROLIGHT, QO_X_HEROLIGHTFL, QO_X_FACEANIM };
 
 /* display_aspect = crt puts the picture on (4:3 x trim), so one framebuffer
  * pixel lands on screen this many times wider than tall at trim 1.0. It is the
@@ -653,6 +653,8 @@ const char* PcOpt_QuickExtraLabel(int which, char* buf, int bufsz)
     }
     case QO_X_HEROLIGHTFL:
         return Pc_LangQuickMenu(g_PcConfig.heroLightWithFlashlight ? "On" : "Off");
+    case QO_X_FACEANIM:
+        return Pc_LangQuickMenu(g_PcConfig.charaFaceAnim ? "On" : "Off");
     case QO_X_LINEGAP: {
         int i = PcOpt_LineGapIndex();
         return (i == 0) ? Pc_LangQuickMenu("Off") : Pc_LangQuick(QO_LINEGAP_LBL[i]);
@@ -1127,6 +1129,12 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
         Sd_PlaySfx(Sfx_MenuMove, 0, 64);
         break;
     }
+    /* Read by the skinned-character draw each frame, so it applies live. */
+    case QO_X_FACEANIM:
+        g_PcConfig.charaFaceAnim = !g_PcConfig.charaFaceAnim;
+        PcConfig_SaveKeyValue("chara_face_anim", g_PcConfig.charaFaceAnim ? "1" : "0");
+        Sd_PlaySfx(Sfx_MenuMove, 0, 64);
+        break;
     case QO_X_HEROLIGHTFL:
         g_PcConfig.heroLightWithFlashlight = !g_PcConfig.heroLightWithFlashlight;
         Pc_PpLit_Apply();

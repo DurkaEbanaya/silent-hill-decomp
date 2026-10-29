@@ -20,11 +20,33 @@ for whole-character swaps. Use that guide only when you want to edit the origina
 | Harry | `gamedata/load/CHARA/HERO.glb` |
 | Cybil | `gamedata/load/CHARA/SIBYL.glb` |
 | Monster Cybil | `gamedata/load/CHARA/MSB.glb` (optional) |
+| Lisa | `gamedata/load/CHARA/LISA.glb` |
+| Bloody Lisa | `gamedata/load/CHARA/BLISA.glb` |
+| Dahlia | `gamedata/load/CHARA/DARIA.glb` |
+| Kaufmann | `gamedata/load/CHARA/KAU.glb` |
+| Cheryl | `gamedata/load/CHARA/SRL.glb` |
+| Alessa | `gamedata/load/CHARA/AR.glb` |
+| Ghost Alessa | `gamedata/load/CHARA/TAR.glb` |
+| Incubator | `gamedata/load/CHARA/MAR.glb` |
+| Bloody Incubator | `gamedata/load/CHARA/BAR.glb` |
+| Ghost doctor | `gamedata/load/CHARA/DOC.glb` |
 
-The steps below use Harry's `HERO`. For Cybil, use `SIBYL` in every file name. The game
-spells her model file that way. The same file is used in her ending scene, and for Monster
-Cybil when there is no `MSB.glb`, so one Cybil model covers all three. Add an `MSB.glb` only
-if you want the possessed Cybil to look different.
+The steps below use Harry's `HERO`. For anyone else, use their name from the table in every
+file name; those are the game's own model file names. Cybil's file is used in her ending
+scene, and for Monster Cybil when there is no `MSB.glb`, so one Cybil model covers all three.
+Add an `MSB.glb` only if you want the possessed Cybil to look different. Dahlia's and
+Kaufmann's files are used in their ending scenes too.
+
+The game scales and poses a model onto each character's own skeleton at its first animation
+frame, the pose `tools/ilm_obj.py export` writes by default, so export the original model
+that way to get a reference to build against.
+
+**Character Face Animation** (F10 quick menu, Graphics page 1; `chara_face_anim`, on by
+default) makes the original characters blink, move their mouths to their voice lines and
+breathe, without any mod: it draws their own face and chest from the port's
+`gamedata/builtin/CHARA` models. A replacement in `gamedata/load/CHARA` always takes over
+from it. The ghost doctor, ghost Alessa and the Incubator are see-through, so they stay as
+they are.
 
 ## Quick start
 
