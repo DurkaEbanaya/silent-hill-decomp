@@ -18,7 +18,7 @@ BONES = {'Spine': 1, 'Head': 2, 'RightShoulder': 3, 'RightArm': 4, 'RightForeArm
 
 
 def read_obj(p):
-    V, VT, VN, parts = [], [], [], {}
+    V, VT, VN, parts, vpart = [], [], [], {}, []
     cur = mat = None
     for l in open(p):
         t = l.split()
@@ -27,7 +27,7 @@ def read_obj(p):
         if t[0] == 'o':
             cur = t[1]; parts[cur] = []
         elif t[0] == 'v':
-            V.append([float(x) for x in t[1:4]])
+            V.append([float(x) for x in t[1:4]]); vpart.append(cur)
         elif t[0] == 'vt':
             VT.append([float(x) for x in t[1:3]])
         elif t[0] == 'vn':
@@ -41,7 +41,7 @@ def read_obj(p):
                 corners.append([int(a) - 1 if a else -1 for a in f])
             for k in range(1, len(corners) - 1):
                 parts[cur].append((mat, [corners[0], corners[k], corners[k + 1]]))
-    return np.array(V), np.array(VT), np.array(VN), parts
+    return np.array(V), np.array(VT), np.array(VN), parts, vpart
 
 
 def rest_RT(restfile):
@@ -67,8 +67,25 @@ def rest_T(restfile):
     return np.array(T)
 
 
-V, VT, VN, parts = read_obj(objp)
+V, VT, VN, parts, vpart = read_obj(objp)
 T = rest_T(restp)
+
+# Each part lists its own vertices, then ones it shares from other parts (the
+# neck's lower ring is the chest's). The game moves a shared vertex with its
+# owner, so it is bound to the owner's bone here, or the seam would tear.
+meta = json.load(open(objp[:-4] + '.ilmmeta.json'))
+names = [m['name'] for m in meta['models']]
+vbone = []
+seen = {}
+for vi, pn in enumerate(vpart):
+    k = seen.get(pn, 0); seen[pn] = k + 1
+    mm = meta['models'][names.index(pn)]
+    if k < mm['ownVertexCount']:
+        vbone.append(int(pn[:2]))
+    else:
+        owner = names[mm['foreignVerts'][k - mm['ownVertexCount']]['ownerModel']]
+        vbone.append(int(owner[:2]))
+vbone = [b if b < 18 else 2 for b in vbone]
 sel = {k: v for k, v in parts.items() if k[:2] in ('01', '02')}
 alpha = [k for k, v in sel.items() if any(m and m.endswith('_alpha') for m, _ in v)]
 if alpha:
@@ -98,8 +115,9 @@ for mat, tris in mats.items():
     W, H = im.size
     keymap, P, N, UV, J, SRC, PART = {}, [], [], [], [], [], []
     idx = []
-    for bone, tri, pname in tris:
+    for _, tri, pname in tris:
         for vi, ti, ni in tri:
+            bone = vbone[vi]
             u_px = VT[ti][0] * 256.0 - 0.5
             v_px = (1.0 - VT[ti][1]) * 256.0 - 0.5
             uv = ((u_px + 0.5) / W, (v_px + 0.5) / H)
@@ -197,7 +215,9 @@ if targets:
     mesh['extras'] = {'targetNames': targets}
     mesh['weights'] = [0.0] * len(targets)
 nodes.append({'name': 'face', 'mesh': 0, 'skin': 0})
-nodes.append({'name': 'SH_NATIVE'})
+# The bones whose stock parts this replaces; shared seam vertices on other
+# bones do not count.
+nodes.append({'name': 'SH_NATIVE ' + ' '.join(str(b) for b in sorted({int(k[:2]) for k in sel}))})
 g = {'asset': {'version': '2.0', 'generator': 'npc2glb'}, 'scene': 0,
      'scenes': [{'nodes': [0, len(nodes) - 2, len(nodes) - 1]}], 'nodes': nodes, 'meshes': [mesh], 'skins': [skin],
      'materials': materials, 'textures': textures, 'images': images,

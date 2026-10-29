@@ -1280,6 +1280,11 @@ int main(int argc, char* argv[])
         Pc_PpLit_Apply();
     }
 
+    {
+        extern void Pc_SkinChara_PreloadBuiltins(void);
+        Pc_SkinChara_PreloadBuiltins();
+    }
+
     /* Select the backend before applying backend-specific controls. */
     {
         extern void PsyX_SPUAL_ConfigureOutput(int backend, int mode, int rate, int bitPerfect);

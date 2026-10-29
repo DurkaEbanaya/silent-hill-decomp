@@ -1133,6 +1133,10 @@ void PcOpt_QuickExtraAdjust(int which, int dir)
     case QO_X_FACEANIM:
         g_PcConfig.charaFaceAnim = !g_PcConfig.charaFaceAnim;
         PcConfig_SaveKeyValue("chara_face_anim", g_PcConfig.charaFaceAnim ? "1" : "0");
+        {
+            extern void Pc_SkinChara_PreloadBuiltins(void);
+            Pc_SkinChara_PreloadBuiltins();
+        }
         Sd_PlaySfx(Sfx_MenuMove, 0, 64);
         break;
     case QO_X_HEROLIGHTFL:

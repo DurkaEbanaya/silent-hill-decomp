@@ -514,6 +514,7 @@ typedef struct
     int         handRelax; /* ini: percent of the fist held with empty hands */
     int         female;
     int         native; /* built in game space (SH_NATIVE node): the game's own parts */
+    u32         nativeBones; /* the bones whose stock parts it replaces */
     int         brightness; /* percent of the lit vertex colour */
     int         fogPct;     /* percent of the game's fog amount */
     int         beamPct;    /* percent of the flashlight beam it takes */
@@ -1565,9 +1566,26 @@ static int Skin_Load(PcSkinChara* ch, const char* path)
      * bones (the face and chest), so it is neither fitted to Harry's height
      * nor reweighted, and the stock parts it does not cover keep drawing. */
     ch->native = 0;
+    ch->nativeBones = 0;
     for (ni = 0; ni < data->nodes_count; ni++)
-        if (data->nodes[ni].name != NULL && strcmp(data->nodes[ni].name, "SH_NATIVE") == 0)
-            ch->native = 1;
+    {
+        const char* nn = data->nodes[ni].name;
+        if (nn == NULL || strncmp(nn, "SH_NATIVE", 9) != 0)
+            continue;
+        ch->native = 1;
+        /* "SH_NATIVE 1 2": the bones it replaces. Shared seam vertices bound
+         * to other bones (the shoulders' edge of the chest) do not count. */
+        for (nn += 9; *nn != '\0';)
+        {
+            char* end;
+            long b = strtol(nn, &end, 10);
+            if (end == nn)
+                break;
+            if (b >= 0 && b < PC_SKIN_BONES)
+                ch->nativeBones |= 1u << b;
+            nn = end;
+        }
+    }
     if (skin->joints_count == 0 || skin->joints_count > PC_SKIN_MAX_JOINTS || skin->inverse_bind_matrices == NULL)
     {
         SH_DBG("[SKIN] %s: skin has %u joints / no inverse bind matrices", path, (unsigned)skin->joints_count);
@@ -2491,6 +2509,23 @@ static PcSkinChara* Skin_Entry(const char* name, const char* file, const char* b
     return ch;
 }
 
+/* Character Face Animation's models, read up front: parsing a glTF and its
+ * textures the first time a character appears hitched the scene it entered. */
+void Pc_SkinChara_PreloadBuiltins(void)
+{
+    char file[20], path[112];
+    int  i;
+
+    if (!g_PcConfig.charaFaceAnim)
+        return;
+    for (i = 0; i < (int)(sizeof(s_restDefs) / sizeof(s_restDefs[0])); i++)
+    {
+        snprintf(file, sizeof(file), "@%s", s_restDefs[i].name);
+        snprintf(path, sizeof(path), "gamedata/builtin/CHARA/%s", s_restDefs[i].name);
+        Skin_Entry(s_restDefs[i].name, file, path, &s_restDefs[i]);
+    }
+}
+
 void Pc_SkinChara_SetHeroFile(const char* file)
 {
     snprintf(s_heroFile, sizeof(s_heroFile), "%s", file != NULL ? file : "");
@@ -2586,9 +2621,10 @@ int Pc_SkinChara_KeepsStockPart(void* chara, const char partName[8], int bone)
     char n[9];
     memcpy(n, partName, 8);
     n[8] = 0;
-    /* A native model replaces only the bones it has geometry on. */
+    /* A native model replaces only the bones it names. */
     if (ch != NULL && ch->native)
-        return bone < 0 || bone >= PC_SKIN_BONES || ch->byBoneCount[bone] == 0;
+        return bone < 0 || bone >= PC_SKIN_BONES ||
+               !(ch->nativeBones ? (ch->nativeBones >> bone) & 1 : ch->byBoneCount[bone] != 0);
     return strstr(n, "GUN") != NULL;
 }
 
