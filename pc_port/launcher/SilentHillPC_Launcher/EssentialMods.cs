@@ -22,6 +22,12 @@ namespace SilentHillPC_Launcher
         [DataMember(Name = "url")]         public string Url;
         [DataMember(Name = "size")]        public long   Size;
         [DataMember(Name = "sha256")]      public string Sha256;
+        [DataMember(Name = "kind")]        public string Kind; /* "character" = a HERO_* playable character */
+
+        public bool IsCharacter
+        {
+            get { return string.Equals(Kind, "character", StringComparison.OrdinalIgnoreCase); }
+        }
     }
 
     [DataContract]

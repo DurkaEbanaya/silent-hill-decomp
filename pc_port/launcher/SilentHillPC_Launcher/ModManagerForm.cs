@@ -43,8 +43,10 @@ namespace SilentHillPC_Launcher
         private EssentialCatalog _catalog;
         private bool _catalogLoading = true;
         private bool _essentialExpanded;
+        private bool _charsExpanded; // the Additional Characters fold inside the section
         private readonly HashSet<string> _toInstall = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private sealed class EssentialHeader { }
+        private sealed class EssentialCharsHeader { }
         private sealed class EssentialRow { public EssentialMod Mod; }
         // Installed mods shown as their catalog row, so each is listed once.
         private readonly Dictionary<ModEntry, EssentialMod> _bound = new Dictionary<ModEntry, EssentialMod>();
@@ -512,7 +514,8 @@ namespace SilentHillPC_Launcher
 
         private string EssentialLabel(ModEntry m, EssentialMod em)
         {
-            return "    " + (string.IsNullOrEmpty(m.DisplayName) ? em.Name : m.DisplayName);
+            return (em.IsCharacter ? "        " : "    ") +
+                   (string.IsNullOrEmpty(m.DisplayName) ? em.Name : m.DisplayName);
         }
 
         /// <summary>The Essential QoL Mods section: a header row, then one row per catalog
@@ -534,43 +537,73 @@ namespace SilentHillPC_Launcher
             if (!any) return;
 
             foreach (var em in _catalog.Mods)
+                if (!em.IsCharacter) AddEssentialRow(em, "    ", _essentialExpanded);
+
+            // Character mods sit behind one Additional Characters row of their own.
+            var chars = _catalog.Mods.Where(m => m.IsCharacter).ToList();
+            if (chars.Count == 0) return;
+            if (_essentialExpanded)
             {
-                var inst = _bound.FirstOrDefault(kv => kv.Value == em).Key;
-                if (inst != null)
+                int installed = chars.Count(em => _bound.ContainsValue(em));
+                int ticked    = chars.Count(em => _toInstall.Contains(em.Id) && !_bound.ContainsValue(em));
+                var sub = new ListViewItem("    " + (_charsExpanded ? "▼ " : "▶ ") + Loc.T("Additional Characters"))
                 {
-                    var item = new ListViewItem(EssentialLabel(inst, em))
-                    {
-                        Tag = inst, Checked = inst.Enabled, ToolTipText = em.Description ?? ""
-                    };
-                    item.SubItems.Add(string.IsNullOrEmpty(inst.Author) ? em.Author ?? "" : inst.Author);
-                    item.SubItems.Add(Loc.T(inst.TypeLabel));
-                    item.SubItems.Add(Loc.T(inst.StateLabel));
-                    item.SubItems.Add(string.IsNullOrEmpty(inst.Description) ? em.Description ?? "" : inst.Description);
-                    _list.Items.Add(item);
-                    continue;
-                }
-                if (!_essentialExpanded) continue;
-                var row = new ListViewItem("    " + em.Name)
-                {
-                    Tag = new EssentialRow { Mod = em },
-                    Checked = _toInstall.Contains(em.Id),
-                    ToolTipText = em.Description ?? ""
+                    Tag = new EssentialCharsHeader(),
+                    ToolTipText = Loc.T("Click to show or hide. Tick the characters you want and press Apply.")
                 };
-                row.SubItems.Add(em.Author ?? "");
-                row.SubItems.Add(Loc.F("Download ({0} MB)", Math.Max(1, (em.Size + 524288) / 1048576)));
-                row.SubItems.Add(Loc.T("Not installed"));
-                row.SubItems.Add(em.Description ?? "");
-                _list.Items.Add(row);
+                sub.SubItems.Add(string.Join(", ", chars.Select(c => c.Name)));
+                sub.SubItems.Add("");
+                sub.SubItems.Add(ticked > 0 ? Loc.F("{0} to install", ticked)
+                                            : Loc.F("{0} of {1} installed", installed, chars.Count));
+                sub.SubItems.Add(Loc.T("Playable characters for the Play as option and the multiplayer Character row. Online, a partner without the same character sees Harry."));
+                sub.Font = new Font(_list.Font, FontStyle.Bold);
+                _list.Items.Add(sub);
             }
+            foreach (var em in chars)
+                AddEssentialRow(em, "        ", _essentialExpanded && _charsExpanded);
+        }
+
+        /// <summary>One catalog mod: its installed entry when there is one (always shown),
+        /// else a download row when its fold is open.</summary>
+        private void AddEssentialRow(EssentialMod em, string indent, bool showUninstalled)
+        {
+            var inst = _bound.FirstOrDefault(kv => kv.Value == em).Key;
+            if (inst != null)
+            {
+                var item = new ListViewItem(EssentialLabel(inst, em))
+                {
+                    Tag = inst, Checked = inst.Enabled, ToolTipText = em.Description ?? ""
+                };
+                item.SubItems.Add(string.IsNullOrEmpty(inst.Author) ? em.Author ?? "" : inst.Author);
+                item.SubItems.Add(Loc.T(inst.TypeLabel));
+                item.SubItems.Add(Loc.T(inst.StateLabel));
+                item.SubItems.Add(string.IsNullOrEmpty(inst.Description) ? em.Description ?? "" : inst.Description);
+                _list.Items.Add(item);
+                return;
+            }
+            if (!showUninstalled) return;
+            var row = new ListViewItem(indent + em.Name)
+            {
+                Tag = new EssentialRow { Mod = em },
+                Checked = _toInstall.Contains(em.Id),
+                ToolTipText = em.Description ?? ""
+            };
+            row.SubItems.Add(em.Author ?? "");
+            row.SubItems.Add(Loc.F("Download ({0} MB)", Math.Max(1, (em.Size + 524288) / 1048576)));
+            row.SubItems.Add(Loc.T("Not installed"));
+            row.SubItems.Add(em.Description ?? "");
+            _list.Items.Add(row);
         }
 
         private void OnListMouseClick(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
             var hit = _list.HitTest(e.Location);
-            if (hit.Item == null || !(hit.Item.Tag is EssentialHeader)) return;
+            if (hit.Item == null) return;
             if (_catalog == null || _catalog.Mods.Count == 0) return;
-            _essentialExpanded = !_essentialExpanded;
+            if (hit.Item.Tag is EssentialHeader)           _essentialExpanded = !_essentialExpanded;
+            else if (hit.Item.Tag is EssentialCharsHeader) _charsExpanded = !_charsExpanded;
+            else return;
             CommitOrderAndState();
             Populate();
         }
