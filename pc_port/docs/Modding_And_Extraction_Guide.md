@@ -137,7 +137,9 @@ via the same ISO9660 reader the game uses).
   characters) also gets a `NAME_reference.png` beside it in one pass: the correct in-game
   look, which installs as it is or can be painted over and *Rebuilt* (see §5.1). The
   composites are built before *Delete original TIM* removes anything, so the two boxes work
-  together. Same result as *Reference ▾ → Every texture…*, which also builds the whole-tree
+  together. Tick *Put composites in a subfolder* to collect them under `composites/` in the
+  extract instead, laid out like the disc, so its `BG`, `CHARA`... folders copy straight into
+  `gamedata/load`. Same result as *Reference ▾ → Every texture…*, which also builds the whole-tree
   palette-row index the composites are derived from.
 - **TIM → PNG…** / **Bulk → PNG…** — convert individual `.TIM` files, or recursively
   convert every `.TIM` under a folder to `<name>.png` in place (with an option to delete the

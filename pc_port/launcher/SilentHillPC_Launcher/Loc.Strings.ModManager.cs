@@ -177,6 +177,8 @@ namespace SilentHillPC_Launcher
                 new[]{ "Convertir texturas (TIM) a PNG", "Converter texturas (TIM) em PNG", "Convertir les textures (TIM) en PNG", "Texturen (TIM) in PNG umwandeln", "Converti texture (TIM) in PNG", "テクスチャ(TIM)をPNGに変換", "将纹理 (TIM) 转换为 PNG", "Конвертировать текстуры (TIM) в PNG", "Konwertuj tekstury (TIM) na PNG" } },
             { "Delete original TIM?",
                 new[]{ "¿Eliminar TIM original?", "Excluir TIM original?", "Supprimer le TIM d'origine ?", "Original-TIM löschen?", "Eliminare il TIM originale?", "元のTIMを削除?", "删除原始 TIM?", "Удалить исходный TIM?", "Usunąć oryginalny TIM?" } },
+            { "Put composites in a subfolder ({0})",
+                new[]{ "Poner los compuestos en una subcarpeta ({0})", "Colocar as composições numa subpasta ({0})", "Placer les composites dans un sous-dossier ({0})", "Komposite in einen Unterordner legen ({0})", "Metti i compositi in una sottocartella ({0})", "合成画像をサブフォルダーに置く({0})", "将合成图放入子文件夹（{0}）", "Сохранять композиты в подпапку ({0})", "Umieść kompozyty w podfolderze ({0})" } },
             { "Build reference composites (one paintable image per texture)",
                 new[]{ "Crear compuestos de referencia (una imagen editable por textura)", "Criar composições de referência (uma imagem editável por textura)", "Créer des composites de référence (une image à retoucher par texture)", "Referenz-Komposite erstellen (ein bemalbares Bild pro Textur)", "Crea compositi di riferimento (un'immagine modificabile per texture)", "参照用合成画像を作成(テクスチャごとに編集用画像1枚)", "生成参考合成图(每个纹理一张可绘制图像)", "Создать эталонные композиты (по одному изображению на текстуру)", "Utwórz kompozyty referencyjne (jeden obraz do malowania na teksturę)" } },
             { "Extract",

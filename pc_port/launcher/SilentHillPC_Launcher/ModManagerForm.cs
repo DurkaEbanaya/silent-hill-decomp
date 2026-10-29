@@ -956,7 +956,8 @@ namespace SilentHillPC_Launcher
             bool convertPng;
             bool deleteTim;
             bool buildRefs;
-            if (!PromptExtractOptions(binPath, out outDir, out convertPng, out deleteTim, out buildRefs)) return;
+            bool refsInSub;
+            if (!PromptExtractOptions(binPath, out outDir, out convertPng, out deleteTim, out buildRefs, out refsInSub)) return;
 
             try { Directory.CreateDirectory(outDir); }
             catch (Exception ex)
@@ -997,15 +998,19 @@ namespace SilentHillPC_Launcher
             }
 
             ClutComposer.ComposeAllResult refRes = null;
+            // In the subfolder the tree mirrors the disc, so its BG, CHARA... folders copy
+            // straight into gamedata/load; beside the textures is the long-standing layout.
+            string refDir = refsInSub ? Path.Combine(outDir, CompositeSubfolder) : null;
             if (buildRefs)
             {
                 try
                 {
                     string tree = outDir;
+                    string dst = refDir;
                     ProgressDialog.RunCancellable(this, Loc.T("Building reference composites…"), (r, cancelled) =>
                     {
                         var idx = ClutComposer.EnsureIndex(tree, (i, n, m) => r(i, n, Loc.F("Indexing {0}", m)));
-                        refRes = ClutComposer.ComposeAll(idx, null, (i, n, m) => r(i, n, m), cancelled);
+                        refRes = ClutComposer.ComposeAll(idx, dst, (i, n, m) => r(i, n, m), cancelled);
                     });
                 }
                 catch (Exception ex)
@@ -1026,7 +1031,9 @@ namespace SilentHillPC_Launcher
             }
             if (buildRefs && refRes != null)
             {
-                msg += Loc.F("Built {0} reference composite(s).", refRes.Made + refRes.Flat) + "\n";
+                msg += (refDir != null
+                    ? Loc.F("{0} reference image(s) in:\n{1}", refRes.Made + refRes.Flat, refDir)
+                    : Loc.F("Built {0} reference composite(s).", refRes.Made + refRes.Flat)) + "\n";
                 msg += InstallableNote() + "\n";
             }
             msg += "\n" + Loc.T("Output folder:") + "\n" + outDir;
@@ -1040,9 +1047,12 @@ namespace SilentHillPC_Launcher
         }
 
         /// <summary>Modal: choose where to extract + whether to also dump textures as PNG.</summary>
-        private bool PromptExtractOptions(string binPath, out string outDir, out bool convertPng, out bool deleteTim, out bool buildRefs)
+        private const string CompositeSubfolder = "composites";
+
+        private bool PromptExtractOptions(string binPath, out string outDir, out bool convertPng, out bool deleteTim,
+                                          out bool buildRefs, out bool refsInSub)
         {
-            outDir = null; convertPng = false; deleteTim = false; buildRefs = false;
+            outDir = null; convertPng = false; deleteTim = false; buildRefs = false; refsInSub = false;
             string defaultOut = Path.Combine(
                 Path.GetDirectoryName(binPath) ?? _gameRoot,
                 Path.GetFileNameWithoutExtension(binPath) + "_extracted");
@@ -1050,7 +1060,7 @@ namespace SilentHillPC_Launcher
             using (var dlg = new Form())
             {
                 dlg.Text            = Loc.T("Extract Disc Image");
-                dlg.ClientSize      = new Size(460, 200);
+                dlg.ClientSize      = new Size(460, 226);
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
                 dlg.StartPosition   = FormStartPosition.CenterParent;
                 dlg.MaximizeBox     = false;
@@ -1084,16 +1094,26 @@ namespace SilentHillPC_Launcher
                 };
                 var chkRef = new CheckBox { Text = Loc.T("Build reference composites (one paintable image per texture)"),
                                            Location = new Point(12, 122), AutoSize = true };
+                var chkSub = new CheckBox { Text = Loc.F("Put composites in a subfolder ({0})", CompositeSubfolder),
+                                           Location = new Point(30, 146), AutoSize = true, Enabled = false };
+                chkRef.CheckedChanged += (s, e) =>
+                {
+                    chkSub.Enabled = chkRef.Checked;
+                    if (!chkRef.Checked) chkSub.Checked = false;
+                };
                 dlg.Controls.Add(chk);
                 dlg.Controls.Add(chkDel);
                 dlg.Controls.Add(chkRef);
+                dlg.Controls.Add(chkSub);
 
-                var ok     = new Button { Text = Loc.T("Extract"), Location = new Point(276, 160), Size = new Size(84, 28), DialogResult = DialogResult.OK };
-                var cancel = new Button { Text = Loc.T("Cancel"),  Location = new Point(364, 160), Size = new Size(84, 28), DialogResult = DialogResult.Cancel };
+                var ok     = new Button { Text = Loc.T("Extract"), Location = new Point(276, 186), Size = new Size(84, 28), DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = Loc.T("Cancel"),  Location = new Point(364, 186), Size = new Size(84, 28), DialogResult = DialogResult.Cancel };
                 // The delete box shares a row with the convert box; push it right if
                 // the translated convert label reaches it, and widen the dialog to fit.
                 chkDel.Left = Math.Max(chkDel.Left, 12 + chk.PreferredSize.Width + 16);
-                int wantW = Math.Max(Math.Max(chkDel.Left + chkDel.PreferredSize.Width, 12 + chkRef.PreferredSize.Width) + 12,
+                int wantW = Math.Max(Math.Max(Math.Max(chkDel.Left + chkDel.PreferredSize.Width,
+                                                       12 + chkRef.PreferredSize.Width),
+                                              chkSub.Left + chkSub.PreferredSize.Width) + 12,
                                      dlg.ClientSize.Width);
                 if (wantW > dlg.ClientSize.Width)
                 {
@@ -1111,6 +1131,7 @@ namespace SilentHillPC_Launcher
                 convertPng = chk.Checked;
                 deleteTim = chk.Checked && chkDel.Checked;
                 buildRefs = chkRef.Checked;
+                refsInSub = chkRef.Checked && chkSub.Checked;
                 return !string.IsNullOrEmpty(outDir);
             }
         }
