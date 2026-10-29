@@ -531,8 +531,10 @@ typedef struct {
     /* The game's own human characters blink, move their mouths to their
      * voice lines and breathe: their face and chest drawn from the port's
      * gamedata/builtin/CHARA models instead of the stock parts. A replacement
-     * in load/CHARA still takes over. Applies live.
-     * (config key: chara_face_anim) */
+     * in load/CHARA still takes over. Applies live. Off by default while the
+     * joins are checked; the first build's key, chara_face_anim, shipped on
+     * with gaps at the joints and is ignored, so everyone starts off.
+     * (config key: chara_face_anim2) */
     int  charaFaceAnim;
 
     /* Stock world and characters lit per pixel: the GTE light sum the PSX runs

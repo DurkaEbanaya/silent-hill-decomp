@@ -41,8 +41,8 @@ The game scales and poses a model onto each character's own skeleton at its firs
 frame, the pose `tools/ilm_obj.py export` writes by default, so export the original model
 that way to get a reference to build against.
 
-**Character Face Animation** (F10 quick menu, Graphics page 1; `chara_face_anim`, on by
-default) makes the original characters blink, move their mouths to their voice lines and
+**Character Face Animation** (F10 quick menu, Graphics page 1; `chara_face_anim2`, off by
+default while it is tested) makes the original characters blink, move their mouths to their voice lines and
 breathe, without any mod: it draws their own face and chest from the port's
 `gamedata/builtin/CHARA` models. A replacement in `gamedata/load/CHARA` always takes over
 from it. The ghost doctor, ghost Alessa and the Incubator are see-through, so they stay as
