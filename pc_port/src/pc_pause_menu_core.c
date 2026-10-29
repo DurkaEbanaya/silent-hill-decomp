@@ -13,7 +13,11 @@ void PmMenu_Open(PmMenu* m, PmBlock block)
 unsigned PmMenu_EnabledMask(const PmMenu* m)
 {
     unsigned mask = (1u << PM_ROW_COUNT) - 1u;
-    if (m->block != PM_BLOCK_NONE)
+    /* A boss fight blocks only saving: loading out of one is never the
+     * problem, and quick load (F8) already allows it. */
+    if (m->block == PM_BLOCK_BOSS)
+        mask &= ~(1u << PM_ROW_SAVE);
+    else if (m->block != PM_BLOCK_NONE)
         mask &= ~((1u << PM_ROW_SAVE) | (1u << PM_ROW_LOAD));
     return mask;
 }

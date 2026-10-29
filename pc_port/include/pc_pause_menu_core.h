@@ -4,8 +4,8 @@
 
 #include "pc_native_menu.h"
 
-/* Renderer-free model of the in-game pause menu. SAVE/LOAD are disabled
- * (drawn grey) while a block reason is set; they stay selectable, and
+/* Renderer-free model of the in-game pause menu. SAVE (and LOAD, outside a
+ * boss fight) are disabled (drawn grey) while a block reason is set; they stay selectable, and
  * activating one returns PM_ACT_BLOCKED so the glue can say why. */
 
 typedef enum { PM_ROW_CONTINUE, PM_ROW_QUICK_MENU, PM_ROW_SAVE, PM_ROW_LOAD, PM_ROW_OPTION, PM_ROW_EXIT, PM_ROW_COUNT } PmRow;
