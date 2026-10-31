@@ -2781,6 +2781,7 @@ void MainLoop(void) // 0x80032EE0
          * and DMS chunk loads. Tick the queue every frame on PC. */
         ML_TRACE("Fs_QueueUpdate");
         Fs_QueueUpdate();
+        s_sfFsqEnd = (unsigned int)SDL_GetTicks();
 #else
         if (!Sd_AudioStreamingCheck())
         {
@@ -3098,10 +3099,23 @@ void MainLoop(void) // 0x80032EE0
                                (unsigned long)s_perfFrames);
                         if (s_perfPhaseFrames > 0)
                         {
+                            extern double g_PsyX_GpuMsSum;
+                            extern int    g_PsyX_GpuMsCount;
                             double n = (double)s_perfPhaseFrames;
-                            SH_DBG("[PERF]   per frame: present=%.1f tail=%.1f top=%.1f update=%.1f fsq=%.1f sync=%.1f ms | mapIdx %d",
+                            /* gpu: GPU time from one swap to the next (desktop GL only, -1
+                             * elsewhere). It includes any wait for the game's commands, so
+                             * it reads as GPU-bound only when well above update. */
+                            SH_DBG("[PERF]   per frame: present=%.1f tail=%.1f top=%.1f update=%.1f fsq=%.1f sync=%.1f gpu=%.1f ms | mapIdx %d",
                                    s_perfPhase[0] / n, s_perfPhase[1] / n, s_perfPhase[2] / n, s_perfPhase[3] / n,
-                                   s_perfPhase[4] / n, s_perfPhase[5] / n, g_SavegamePtr != NULL ? (int)g_SavegamePtr->mapIdx : -1);
+                                   s_perfPhase[4] / n, s_perfPhase[5] / n,
+                                   g_PsyX_GpuMsCount > 0 ? g_PsyX_GpuMsSum / g_PsyX_GpuMsCount : -1.0,
+                                   g_SavegamePtr != NULL ? (int)g_SavegamePtr->mapIdx : -1);
+                        }
+                        {
+                            extern double g_PsyX_GpuMsSum;
+                            extern int    g_PsyX_GpuMsCount;
+                            g_PsyX_GpuMsSum = 0.0;
+                            g_PsyX_GpuMsCount = 0;
                         }
                         memset(s_perfPhase, 0, sizeof(s_perfPhase));
                         s_perfPhaseFrames = 0;
